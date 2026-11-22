@@ -1,8 +1,7 @@
 //! Explicit policy and checkout adoption preserve original enrollment evidence.
-#[cfg(verus_keep_ghost)]
-use super::super::identifiers::equal_text;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{verified_identifiers::equal_text, verus};
+use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -14,7 +13,7 @@ pub fn checkout_migration_ready(status: &str, terminal: bool, uses_pending: bool
     ensures ready <==> (status@ == "active"@ && !terminal
         && !uses_pending && !handoff_pending),
 {
-    equal_text(status, "active") && !terminal && !uses_pending && !handoff_pending
+    <&str>::exec_eq(status, "active") && !terminal && !uses_pending && !handoff_pending
 }
 
 pub fn policy_state_present(current: bool, history: bool) -> (present: bool)

@@ -1,8 +1,7 @@
 //! Automatic local endpoint/context production; start/reconstruct own branch birth.
-#[cfg(verus_keep_ghost)]
-use super::equal_text;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{verified_identifiers::equal_text, verus};
+use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -10,7 +9,7 @@ verus! {
 pub fn full_paths_distinct(origin: &str, context: &str, manifest: &str) -> (valid: bool)
     ensures valid == (origin@ != context@ && origin@ != manifest@ && context@ != manifest@),
 {
-    !equal_text(origin, context) && !equal_text(origin, manifest) && !equal_text(context, manifest)
+    !<&str>::exec_eq(origin, context) && !<&str>::exec_eq(origin, manifest) && !<&str>::exec_eq(context, manifest)
 }
 }
 

@@ -1,11 +1,8 @@
 //! Explicit per-object producer registrations; no shared mutable catalogue.
 #![allow(unexpected_cfgs)]
-#[cfg(verus_keep_ghost)]
-use super::super::identifiers::equal_text;
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verified_identifiers::equal_text;
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -28,10 +25,10 @@ pub fn producer_namespace_member(name: &str) -> (member: ProducerNamespaceMember
             && name@ != "rolling-disposals"@,
     },
 {
-    if equal_text(name, "objects.json") { ProducerNamespaceMember::Owner }
-    else if equal_text(name, "producer-records") { ProducerNamespaceMember::Records }
-    else if equal_text(name, "rolling-metadata") { ProducerNamespaceMember::Metadata }
-    else if equal_text(name, "rolling-disposals") { ProducerNamespaceMember::Disposals }
+    if <&str>::exec_eq(name, "objects.json") { ProducerNamespaceMember::Owner }
+    else if <&str>::exec_eq(name, "producer-records") { ProducerNamespaceMember::Records }
+    else if <&str>::exec_eq(name, "rolling-metadata") { ProducerNamespaceMember::Metadata }
+    else if <&str>::exec_eq(name, "rolling-disposals") { ProducerNamespaceMember::Disposals }
     else { ProducerNamespaceMember::Unknown }
 }
 
@@ -99,7 +96,7 @@ pub fn find_producer_declaration<R: ProducerDeclarations>(rows: &R, producer: &s
             forall|j: int| 0 <= j < index ==> rows.name_at(j)@ != producer@,
         decreases count - index,
     {
-        if equal_text(rows.name(index), producer) {
+        if <&str>::exec_eq(rows.name(index), producer) {
             if temporary && !rows.temporary(index) {
                 return Err(ProducerLookupError::NotTemporary(index));
             }

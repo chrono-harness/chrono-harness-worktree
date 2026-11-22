@@ -1,14 +1,9 @@
 //! 所有者发布的实际身份判断与状态选择；文件系统和编码由调用方提供。
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
-
-#[cfg(verus_keep_ghost)]
-extern crate chrono_identifiers as identifiers;
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verified_identifiers as identifiers;
-use identifiers::{equal_bytes, equal_text};
 
 verus! {
 
@@ -24,12 +19,22 @@ pub open spec fn same_policy_namespace(a: &PolicyNamespace, b: &PolicyNamespace)
         && a.state_directory@ == b.state_directory@
 }
 
+fn equal_bytes(actual: &[u8], expected: &[u8]) -> (equal: bool)
+    ensures equal == (actual@ == expected@),
+{
+    proof {
+        assert(actual.deep_view() =~= actual@);
+        assert(expected.deep_view() =~= expected@);
+    }
+    <&[u8]>::exec_eq(actual, expected)
+}
+
 pub fn policy_namespace_matches(a: &PolicyNamespace, b: &PolicyNamespace) -> (valid: bool)
     ensures valid <==> same_policy_namespace(a, b),
 {
-    equal_text(a.schema.as_str(), b.schema.as_str())
+    <&str>::exec_eq(a.schema.as_str(), b.schema.as_str())
         && equal_bytes(&a.coordinator, &b.coordinator)
-        && equal_text(a.state_directory.as_str(), b.state_directory.as_str())
+        && <&str>::exec_eq(a.state_directory.as_str(), b.state_directory.as_str())
 }
 
 // The JSON/IO adapter provides separate observed and declared values. All
@@ -67,7 +72,7 @@ pub fn valid_stage_names(names: &Vec<String>, nonempty: bool) -> (valid: bool)
             forall|j: int, k: int| 0 <= j < k < i ==> names[j]@ != names[k]@,
         decreases names.len() - i,
     {
-        if nonempty && equal_text(names[i].as_str(), "") { return false; }
+        if nonempty && <&str>::exec_eq(names[i].as_str(), "") { return false; }
         let mut j = 0;
         while j < i
             invariant
@@ -78,7 +83,7 @@ pub fn valid_stage_names(names: &Vec<String>, nonempty: bool) -> (valid: bool)
                 forall|k: int| 0 <= k < j ==> names[k]@ != names[i as int]@,
             decreases i - j,
         {
-            if equal_text(names[j].as_str(), names[i].as_str()) { return false; }
+            if <&str>::exec_eq(names[j].as_str(), names[i].as_str()) { return false; }
             j += 1;
         }
         i += 1;
@@ -86,9 +91,13 @@ pub fn valid_stage_names(names: &Vec<String>, nonempty: bool) -> (valid: bool)
     true
 }
 
+pub open spec fn stage_hex_digit(byte: u8) -> bool {
+    (0x30 <= byte <= 0x39) || (0x61 <= byte <= 0x66)
+}
+
 pub open spec fn stage_digest(bytes: Seq<u8>) -> bool {
     bytes.len() == 64 && forall|i: int| 0 <= i < bytes.len()
-        ==> identifiers::oid_byte(#[trigger] bytes[i])
+        ==> stage_hex_digit(#[trigger] bytes[i])
 }
 
 pub fn valid_stage_digest(bytes: &[u8]) -> (valid: bool)
@@ -99,7 +108,7 @@ pub fn valid_stage_digest(bytes: &[u8]) -> (valid: bool)
     while i < bytes.len()
         invariant
             bytes.len() == 64, 0 <= i <= bytes.len(),
-            forall|j: int| 0 <= j < i ==> identifiers::oid_byte(#[trigger] bytes[j]),
+            forall|j: int| 0 <= j < i ==> stage_hex_digit(#[trigger] bytes[j]),
         decreases bytes.len() - i,
     {
         let byte = bytes[i];
@@ -206,8 +215,8 @@ pub open spec fn same_binding(a: &Binding, b: &Binding) -> bool {
 pub fn binding_equal(a: &Binding, b: &Binding) -> (equal: bool)
     ensures equal <==> same_binding(a, b),
 {
-    equal_text(a.identity.as_str(), b.identity.as_str())
-        && equal_text(a.sha256.as_str(), b.sha256.as_str()) && a.size == b.size
+    <&str>::exec_eq(a.identity.as_str(), b.identity.as_str())
+        && <&str>::exec_eq(a.sha256.as_str(), b.sha256.as_str()) && a.size == b.size
 }
 
 pub open spec fn stage_binding(actual: &Binding, expected: &Staged) -> bool {
@@ -218,8 +227,8 @@ pub open spec fn stage_binding(actual: &Binding, expected: &Staged) -> bool {
 pub fn staged_binding_equal(actual: &Binding, expected: &Staged) -> (equal: bool)
     ensures equal <==> stage_binding(actual, expected),
 {
-    equal_text(actual.identity.as_str(), expected.identity.as_str())
-        && equal_text(actual.sha256.as_str(), expected.sha256.as_str())
+    <&str>::exec_eq(actual.identity.as_str(), expected.identity.as_str())
+        && <&str>::exec_eq(actual.sha256.as_str(), expected.sha256.as_str())
         && actual.size == expected.size
 }
 
@@ -230,7 +239,7 @@ pub open spec fn stage_bytes(actual: &Binding, expected: &Staged) -> bool {
 pub fn staged_bytes_equal(actual: &Binding, expected: &Staged) -> (equal: bool)
     ensures equal <==> stage_bytes(actual, expected),
 {
-    equal_text(actual.sha256.as_str(), expected.sha256.as_str()) && actual.size == expected.size
+    <&str>::exec_eq(actual.sha256.as_str(), expected.sha256.as_str()) && actual.size == expected.size
 }
 
 pub open spec fn same_stage(a: &Stage, b: &Stage) -> bool {
@@ -243,10 +252,10 @@ pub open spec fn same_stage(a: &Stage, b: &Stage) -> bool {
 pub fn stage_equal(a: &Stage, b: &Stage) -> (equal: bool)
     ensures equal <==> same_stage(a, b),
 {
-    equal_text(a.selected.as_str(), b.selected.as_str())
-        && equal_text(a.staged.path.as_str(), b.staged.path.as_str())
-        && equal_text(a.staged.identity.as_str(), b.staged.identity.as_str())
-        && equal_text(a.staged.sha256.as_str(), b.staged.sha256.as_str())
+    <&str>::exec_eq(a.selected.as_str(), b.selected.as_str())
+        && <&str>::exec_eq(a.staged.path.as_str(), b.staged.path.as_str())
+        && <&str>::exec_eq(a.staged.identity.as_str(), b.staged.identity.as_str())
+        && <&str>::exec_eq(a.staged.sha256.as_str(), b.staged.sha256.as_str())
         && a.staged.size == b.staged.size
         && binding_equal(&a.previous, &b.previous)
 }
@@ -292,7 +301,7 @@ pub fn stable_observation(
     ensures stable <==> (before_id@ == after_id@ && before_size == after_size
         && before_seconds == after_seconds && before_nanos == after_nanos),
 {
-    equal_text(before_id, after_id) && before_size == after_size
+    <&str>::exec_eq(before_id, after_id) && before_size == after_size
         && before_seconds == after_seconds && before_nanos == after_nanos
 }
 
@@ -335,7 +344,7 @@ pub fn valid_intent(intent: &Intent, expected: &Stage) -> (valid: bool)
         intent.schema@ == "chrono-bootstrap-owner-publication-intent/v1"@
             && same_stage(&intent.stage, expected)),
 {
-    equal_text(intent.schema.as_str(), "chrono-bootstrap-owner-publication-intent/v1")
+    <&str>::exec_eq(intent.schema.as_str(), "chrono-bootstrap-owner-publication-intent/v1")
         && stage_equal(&intent.stage, expected)
 }
 

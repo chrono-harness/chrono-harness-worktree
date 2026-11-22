@@ -1,13 +1,9 @@
 //! 生命周期选择直接供清理所有者调用；文件存在性与租约由外部接口提供。
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
-#[cfg(verus_keep_ghost)]
-extern crate chrono_identifiers as identifiers;
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verified_identifiers as identifiers;
-pub use identifiers::equal_text;
 
 #[cfg(verus_keep_ghost)]
 #[path = "maintenance.rs"]
@@ -137,8 +133,8 @@ pub fn ordinary_admission(operation: &str) -> (selected: bool)
     ensures selected <==> (operation@ == "use"@ || operation@ == "check"@
         || operation@ == "bootstrap"@),
 {
-    equal_text(operation, "use") || equal_text(operation, "check")
-        || equal_text(operation, "bootstrap")
+    <&str>::exec_eq(operation, "use") || <&str>::exec_eq(operation, "check")
+        || <&str>::exec_eq(operation, "bootstrap")
 }
 
 /// An address left by failed admission has no checkout policy consumer.
@@ -197,9 +193,9 @@ pub open spec fn cleanup_stage(cache: bool, status: Seq<char>, removal: Seq<char
 pub fn cleanup_result(cache: bool, status: &str, removal: &str) -> (stage: CleanupStage)
     ensures stage == cleanup_stage(cache, status@, removal@),
 {
-    if !equal_text(status, "cleaned") { CleanupStage::Failed }
+    if !<&str>::exec_eq(status, "cleaned") { CleanupStage::Failed }
     else if cache { CleanupStage::CachesReleased }
-    else if equal_text(removal, "verified-absent") || equal_text(removal, "already-absent") {
+    else if <&str>::exec_eq(removal, "verified-absent") || <&str>::exec_eq(removal, "already-absent") {
         CleanupStage::Disposed
     } else { CleanupStage::Retained }
 }
@@ -227,13 +223,13 @@ pub fn observed_cleanup_result(cache: bool, enrollment_status: &str,
             cleanup_field(status), cleanup_field(removal)),
 {
     let age = match age_outcome { Some(value) => value, None => "" };
-    let cache_outcome = equal_text(age, "reusable-source-preserved")
-        || equal_text(age, "no-disposable-output-retained-checkout")
-        || (cache && !equal_text(age, "expired-checkout-verified-absent-source-branches-retained"));
+    let cache_outcome = <&str>::exec_eq(age, "reusable-source-preserved")
+        || <&str>::exec_eq(age, "no-disposable-output-retained-checkout")
+        || (cache && !<&str>::exec_eq(age, "expired-checkout-verified-absent-source-branches-retained"));
     let status = match status { Some(value) => value, None => "" };
     let removal = match removal { Some(value) => value, None => "" };
-    let cleaned = equal_text(status, "cleaned");
-    let stage = cleanup_result(cache_outcome && !equal_text(enrollment_status, "terminal"),
+    let cleaned = <&str>::exec_eq(status, "cleaned");
+    let stage = cleanup_result(cache_outcome && !<&str>::exec_eq(enrollment_status, "terminal"),
         status, removal);
     CleanupOutcome { cache: cache_outcome, cleaned, stage }
 }
@@ -243,9 +239,9 @@ pub fn select_cleanup(status: &str, cache_pending: bool, maintenance: bool, arti
         || (status@ == "active"@ && cache_pending)
         || (status@ == "retained"@ && maintenance && !artifacts_only)),
 {
-    equal_text(status, "terminal")
-        || (equal_text(status, "active") && cache_pending)
-        || (equal_text(status, "retained") && maintenance && !artifacts_only)
+    <&str>::exec_eq(status, "terminal")
+        || (<&str>::exec_eq(status, "active") && cache_pending)
+        || (<&str>::exec_eq(status, "retained") && maintenance && !artifacts_only)
 }
 
 pub fn retain_evidence(disposal_authorized: bool, evidence_present: bool) -> (retain: bool)
@@ -258,13 +254,13 @@ pub fn accepts_enrollment_branch(kind: &str, registered: bool) -> (accepted: boo
     ensures accepted <==> (kind@ == "import"@
         || (kind@ == "birth"@ && registered)),
 {
-    equal_text(kind, "import") || (equal_text(kind, "birth") && registered)
+    <&str>::exec_eq(kind, "import") || (<&str>::exec_eq(kind, "birth") && registered)
 }
 
 pub fn accepts_cleanup_branch(kind: &str, registered: bool) -> (accepted: bool)
     ensures accepted <==> (kind@ == "import"@ || registered),
 {
-    equal_text(kind, "import") || registered
+    <&str>::exec_eq(kind, "import") || registered
 }
 
 #[cfg_attr(not(verus_keep_ghost), derive(Debug, PartialEq, Eq))]
@@ -277,7 +273,7 @@ pub enum AdoptedPolicySource {
 pub fn imported_policy_required(kind: &str, migrated: bool) -> (required: bool)
     ensures required <==> (kind@ == "import"@ && !migrated),
 {
-    equal_text(kind, "import") && !migrated
+    <&str>::exec_eq(kind, "import") && !migrated
 }
 
 pub fn restore_present_import(imported: bool, maintenance: bool,
@@ -300,7 +296,7 @@ pub fn adopted_policy_source(kind: &str, migrated: bool, head: &str, current_hea
                 && (head@ != current_head@ || digest@ != current_digest@)),
 {
     if imported_policy_required(kind, migrated) { AdoptedPolicySource::ImportedOriginal }
-    else if equal_text(head, current_head) && equal_text(digest, current_digest) {
+    else if <&str>::exec_eq(head, current_head) && <&str>::exec_eq(digest, current_digest) {
         AdoptedPolicySource::Current
     } else { AdoptedPolicySource::RetainedTarget }
 }

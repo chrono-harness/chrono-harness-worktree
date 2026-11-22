@@ -1,4 +1,6 @@
 #[cfg(verus_keep_ghost)]
+use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(verus_keep_ghost)]
 #[path = "../../worktree/src/verified_lifecycle.rs"]
 mod policy;
 
@@ -109,7 +111,7 @@ fn producer_lookup_preserves_first_match_and_temporary_admission() {
     match policy::find_producer_declaration(&rows, "fixture λ\0\n", true) {
         Err(policy::ProducerLookupError::NotTemporary(index)) => {
             expect(index == 0);
-            expect(policy::equal_text(policy::ProducerLookupError::NotTemporary(index).message(),
+            expect(<&str>::exec_eq(policy::ProducerLookupError::NotTemporary(index).message(),
                 "temporary producer is not prospectively adopted"));
         },
         _ => expect(false),
@@ -138,7 +140,7 @@ fn producer_lookup_rejects_absence_and_nearby_full_names() {
     }
     let rows = DeclarationRows { rows: Vec::new() };
     match policy::find_producer_declaration(&rows, "", false) {
-        Err(policy::ProducerLookupError::Missing) => expect(policy::equal_text(
+        Err(policy::ProducerLookupError::Missing) => expect(<&str>::exec_eq(
             policy::ProducerLookupError::Missing.message(), "retained producer store is not declared by its owner")),
         _ => expect(false),
     }
@@ -147,7 +149,7 @@ fn producer_lookup_rejects_absence_and_nearby_full_names() {
     entries.push(("Fixture", true));
     let rows = DeclarationRows { rows: entries };
     match policy::find_producer_declaration(&rows, "fixture", true) {
-        Err(policy::ProducerLookupError::Missing) => expect(policy::equal_text(
+        Err(policy::ProducerLookupError::Missing) => expect(<&str>::exec_eq(
             policy::ProducerLookupError::Missing.message(), "retained producer store is not declared by its owner")),
         _ => expect(false),
     }
@@ -268,7 +270,7 @@ fn single_store_adapter_preserves_value_and_full_missing_error() {
     }
     let stores: Vec<u8> = Vec::new();
     match policy::take_resolved_store(stores) {
-        Err(error) => expect(policy::equal_text(error, "retained producer store was not resolved")),
+        Err(error) => expect(<&str>::exec_eq(error, "retained producer store was not resolved")),
         _ => expect(false),
     }
 }

@@ -1,9 +1,6 @@
-#[cfg(verus_keep_ghost)]
-use super::identifiers;
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verified_identifiers as identifiers;
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -49,7 +46,7 @@ pub fn select_report_input_scope<S, T, R, E, O, P, C>(
 {
     let ghost initial = state;
     let ghost original = publication;
-    let maintenance = identifiers::equal_text(operation, "maintain");
+    let maintenance = <&str>::exec_eq(operation, "maintain");
     let selected = match publication {
         Some(publication) => if maintenance {
             outputs(state, publication)

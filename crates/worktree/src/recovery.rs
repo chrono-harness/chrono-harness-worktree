@@ -1,11 +1,8 @@
 //! Immutable pre-effect identity; an intent never certifies completion or a stopped process.
 #![allow(unexpected_cfgs)]
-#[cfg(verus_keep_ghost)]
-use super::identifiers::equal_text;
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verified_identifiers::equal_text;
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -36,7 +33,7 @@ pub open spec fn required_text(observed: Option<&str>, expected: &str) -> bool {
 fn matches_required(observed: Option<&str>, expected: &str) -> (valid: bool)
     ensures valid == required_text(observed, expected),
 {
-    match observed { Some(text) => equal_text(text, expected), None => false }
+    match observed { Some(text) => <&str>::exec_eq(text, expected), None => false }
 }
 
 pub fn imported_policy_receipt_valid(receipt: &ImportedPolicyReceipt, published: bool,

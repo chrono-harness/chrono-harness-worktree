@@ -1,4 +1,6 @@
 #[cfg(verus_keep_ghost)]
+use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(verus_keep_ghost)]
 use super::{expect, policy};
 
 #[cfg(verus_keep_ghost)]
@@ -75,9 +77,9 @@ fn linked_caller_regression<C, G, B, R, O, P>(gate: G, build: B, run: R, observe
     let out = match observed {
         Err(error) => Err(error),
         Ok(fields) => {
-            if result.0 == 0 && policy::equal_text(result.1.as_str(), expected.0.as_str())
-                && policy::equal_text(fields.0.as_str(), "unique caller source λ\n")
-                && policy::equal_text(fields.1.as_str(), expected.1.as_str()) && !fields.2 {
+            if result.0 == 0 && <&str>::exec_eq(result.1.as_str(), expected.0.as_str())
+                && <&str>::exec_eq(fields.0.as_str(), "unique caller source λ\n")
+                && <&str>::exec_eq(fields.1.as_str(), expected.1.as_str()) && !fields.2 {
                 Ok(())
             } else {
                 Err("linked maintenance changed its caller or failed to retire its sibling".to_string())
@@ -120,7 +122,7 @@ fn caller_case(code: i32, reported: &str, source: &str, head: &str,
     expect(result.is_ok() == expected);
     if failure {
         match result {
-            Err(error) => expect(policy::equal_text(error.as_str(), "observation λ\0\n")),
+            Err(error) => expect(<&str>::exec_eq(error.as_str(), "observation λ\0\n")),
             Ok(()) => expect(false),
         }
     }
