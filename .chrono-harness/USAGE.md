@@ -4,7 +4,7 @@
 
 首次检出运行 `mise trust` 和 `mise run harness-setup`。工具版本见 [.config/mise/conf.d/chrono-harness.toml](../.config/mise/conf.d/chrono-harness.toml)。
 
-通用规则来自本仓固定版 `chrono-instructions` 的默认清单。修改宿主登记后，运行 `mise exec -- chrono-instructions generate --host-root .`。
+开始每项任务时运行 `mise exec -- chrono-instructions rules --host-root .`，读取并遵循标准输出中的上游规则。仓库追加说明见根 `CLAUDE.md`。
 
 
 

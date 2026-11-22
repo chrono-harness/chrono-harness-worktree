@@ -56,11 +56,11 @@ macos-arm64 = { url = "https://github.com/chrono-harness/chrono-harness-inputs/r
 
 
 [tools."http:chrono-instructions"]
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 bin = "chrono-instructions"
 [tools."http:chrono-instructions".platforms]
-linux-x64 = { url = "https://github.com/chrono-harness/chrono-harness-instructions/releases/download/v0.1.0-alpha.1/chrono-instructions-linux-x86_64", checksum = "sha256:ca7741f98c21f0b468c663e1347517d3be6071a938242264741e50a6fc0d5693" }
-macos-arm64 = { url = "https://github.com/chrono-harness/chrono-harness-instructions/releases/download/v0.1.0-alpha.1/chrono-instructions-macos-aarch64", checksum = "sha256:3a5b069c75a75d7e38f6b6244df9d9c4ccf2cf759a8d399d873b143e6132cef6" }
+linux-x64 = { url = "https://github.com/chrono-harness/chrono-harness-instructions/releases/download/v0.1.0-alpha.2/chrono-instructions-linux-x86_64", checksum = "sha256:1a9fbcf3222facdd41de2452b56fb4d3d0086977acc4f6c8663e7d50a4033d06" }
+macos-arm64 = { url = "https://github.com/chrono-harness/chrono-harness-instructions/releases/download/v0.1.0-alpha.2/chrono-instructions-macos-aarch64", checksum = "sha256:8dd87139527303a602a4f381e3fa02151285e2be6522f47a1bc76361cab8dabc" }
 
 
 [tools."http:chrono-judge-ci"]
@@ -159,6 +159,6 @@ macos-arm64 = { url = "https://github.com/verus-lang/verus/releases/download/rel
 
 
 [tasks.harness-setup]
-description = "Install this repository's tools and initialize its selected agent rules"
-run = ["mise install", "chrono-instructions init --host-root ."]
+description = "Install this repository's selected tools"
+run = "mise install"
 
