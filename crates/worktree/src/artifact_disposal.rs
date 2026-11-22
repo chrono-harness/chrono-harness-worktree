@@ -1,0 +1,155 @@
+//! Explicit directory disposal shared by legacy checkout cleanup and lifecycle cleanup.
+use crate::start::Runner;
+use chrono_harness::no_symlink_parents;
+use serde_json::{Value, json};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
+pub(crate) fn registered(names: &[String], endpoints: &[&Value]) -> Result<(), String> {
+    for name in names {
+        for host in endpoints {
+            if !host["artifacts"]
+                .as_array()
+                .ok_or("missing artifact registrations")?
+                .iter()
+                .any(|a| a["path"] == *name && a["tracked"] == false)
+            {
+                return Err(
+                    "disposal directory is not an artifact in both endpoint registries".into(),
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn paths(
+    r: &mut Runner,
+    target: &Path,
+    head: &str,
+    names: &[String],
+) -> Result<Vec<PathBuf>, String> {
+    if names.is_empty() {
+        return Ok(vec![]);
+    }
+    let tree = r.tree(target, head)?;
+    // Staged files are also source, including additions within an artifact prefix.
+    let index = crate::start::paths(r.git(target, &["ls-files", "-z"])?)?;
+    names
+        .iter()
+        .map(|name| {
+            if tree
+                .keys()
+                .map(chrono_harness::facts::TreePath::as_str)
+                .chain(index.iter().map(String::as_str))
+                .any(|p| p.starts_with(name) || p == name.trim_end_matches('/'))
+            {
+                return Err(format!("disposal directory contains tracked paths: {name}"));
+            }
+            let path = no_symlink_parents(target, name.trim_end_matches('/'))?;
+            match fs::symlink_metadata(&path) {
+                Ok(m) if m.is_dir() => Ok(path),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(path),
+                Err(e) => Err(e.to_string()),
+                Ok(_) => Err(format!("disposal requires a physical directory: {name}")),
+            }
+        })
+        .collect()
+}
+
+pub use chrono_harness::artifact_disposal::{ArtifactFootprint, artifact_footprint};
+
+pub(crate) fn dispose(
+    target: &Path,
+    names: &[String],
+    paths: &[PathBuf],
+    report: &mut Value,
+    mut before_effect: impl FnMut() -> Result<(), String>,
+) -> Result<(), String> {
+    let state = |path: &Path, name: &str| match fs::symlink_metadata(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("already-absent"),
+        Err(e) => Err(e.to_string()),
+        Ok(m) if m.is_dir() => Ok("attempted-unverified"),
+        Ok(_) => Err(format!("disposal requires a physical directory: {name}")),
+    };
+    for (name, path) in names.iter().zip(paths) {
+        no_symlink_parents(target, name.trim_end_matches('/'))?;
+        let mut observed = state(path, name)?;
+        // An absent output has no removal effect. Recheck both ownership and
+        // the physical path before every actual removal.
+        if observed != "already-absent" {
+            before_effect()?;
+            no_symlink_parents(target, name.trim_end_matches('/'))?;
+            observed = state(path, name)?;
+        }
+        let measured = report["automatic_cleanup"] == true;
+        let mut effect = json!({"path":name,"status":observed});
+        if measured {
+            effect["byte_measure"] = json!("literal-entry-lengths");
+            let footprint = artifact_footprint(path)?;
+            effect["bytes_before"] = json!(footprint.logical_bytes);
+            effect["footprint_before"] = json!(footprint);
+            effect["allocated_measure"] = json!("lstat-blocks-times-512-including-directories");
+            effect["physical_release_bytes"] = Value::Null;
+            effect["bytes_after"] = json!(if observed == "already-absent" {
+                Some(0)
+            } else {
+                None::<u64>
+            });
+        }
+        report["artifact_disposals"]
+            .as_array_mut()
+            .ok_or("missing artifact disposal report")?
+            .push(effect);
+        if observed == "already-absent" {
+            continue;
+        }
+        let _retention = chrono_harness::retained_artifacts::retention::external_removal_guard(
+            target,
+            name.trim_end_matches('/'),
+        )?;
+        if let Some(retention) = &_retention {
+            retention.stable()?;
+        }
+        // Internal links are unlinked; their external targets are never traversed.
+        if let Err(error) = chrono_harness::artifact_disposal::dispose_directory(path) {
+            let effect = report["artifact_disposals"]
+                .as_array_mut()
+                .unwrap()
+                .last_mut()
+                .unwrap();
+            effect["status"] = json!("failed-partial-effects-possible");
+            effect["error"] = json!(error.to_string());
+            if measured {
+                match artifact_footprint(path) {
+                    Ok(remaining) => {
+                        effect["bytes_after"] = json!(remaining.logical_bytes);
+                        effect["footprint_after"] = json!(remaining);
+                    }
+                    Err(observation_error) => {
+                        effect["remaining_measure_error"] = json!(observation_error)
+                    }
+                }
+            }
+            return Err(format!("artifact disposal {name}: {error}"));
+        }
+        match fs::symlink_metadata(path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e.to_string()),
+            Ok(_) => return Err(format!("disposed artifact still exists: {name}")),
+        }
+        let effect = report["artifact_disposals"]
+            .as_array_mut()
+            .unwrap()
+            .last_mut()
+            .unwrap();
+        effect["status"] = json!("verified-absent");
+        if measured {
+            effect["bytes_after"] = json!(0);
+            effect["footprint_after"] = json!(artifact_footprint(path)?);
+        }
+    }
+    Ok(())
+}

@@ -1,0 +1,38 @@
+[package]
+name = "chrono-worktree"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Explicit host worktree lifecycle operations"
+
+[lib]
+test = false
+doctest = false
+
+[features]
+# Deterministic scheduling seam used only by the dedicated receipt behavior tests.
+producer-birth-test = []
+
+[[bin]]
+name = "chrono-worktree"
+path = "src/main.rs"
+test = false
+bench = false
+
+[dependencies]
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "a1cff08f74d996d618372f20adc203d1b5904d50" }
+chrono-judge-registration = { git = "https://github.com/chrono-harness/chrono-harness-judge-registration.git", rev = "76530cce04ad04ebda2f71a16a8a51f930c2daa8" }
+chrono-judge-workflow = { git = "https://github.com/chrono-harness/chrono-harness-judge-workflow.git", rev = "780f1ec2a48626f9eee19b1cb47fbbc55f3c5895" }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["raw_value"] }
+tempfile = "3"
+libc = "0.2"
+time = { version = "0.3", features = ["formatting"] }
+
+[profile.dev.package.sha2]
+opt-level = 3
+
+# Match the runner development profile for the shared inventory implementation.
+[profile.dev]
+opt-level = 1
