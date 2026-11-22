@@ -15,23 +15,17 @@ mise trust
 mise run harness-setup
 ```
 
-
 本仓选装的工具为 `cache`、`ci`、`distribution`、`harness`、`host-bootstrap`、`host-release`、`inputs`、`instructions`、`judge-ci`、`judge-cost`、`judge-filemap`、`judge-mixed`、`judge-projects`、`registration`、`judge-routes`、`judge-workflow`、`pr`、`worktree`、`verus`。
 
 本仓安装选择保存在 `.chrono-harness/template-answers.yml`，版本和平台校验值保存在 `.config/mise/conf.d/chrono-harness.toml`。
 
-
-项目的源码位置、构建及验证入口见本仓 README。
-
-
 开始和结束任务时，用 `mise exec -- chrono-pr pr-reminders` 查看本工作树中自己打开的 PR。用 `mise exec -- chrono-pr pr-status --pr NUMBER --head-sha SHA` 核对指定候选。
-
 
 ## 基础指令
 
 默认采用上游全部现有规则和以后新增的规则。`.chrono-harness/rules.json` 中的 `{"mode":"all"}` 表示全选。要屏蔽个别规则，在 all 模式设置 `exclude`。要只选几条，设置 `mode` 为 `only` 并填写 `include`。要关闭继承，使用 `{"mode":"off"}`。
 
-开始任务时运行 `mise exec -- chrono-instructions rules --host-root .` 读取本仓选择后的最新规则。下方是随本次检出提供的规则全文。规则来源与许可见 [来源说明](docs/licenses/methodology-attribution.md) 和 [Apache-2.0](docs/licenses/trureturing-Apache-2.0.txt)。
+下方是本次检出可直接阅读的规则。开始任务时运行 `mise run harness-setup`，它会安装所选工具并按本仓规则选择刷新下方正文。成功后重新阅读本文件。上游暂时不可达时，命令报告失败并保留已有正文。本仓追加说明写在生成块外。规则来源与许可见 [来源说明](docs/licenses/methodology-attribution.md) 和 [Apache-2.0](docs/licenses/trureturing-Apache-2.0.txt)。
 
 <!-- chrono-instructions:begin -->
 本文件由登记规则生成。请修改登记源后重新生成，不要单独编辑本文件。生成成功不代表规则已被遵守或检查已执行。
@@ -160,4 +154,3 @@ mise run harness-setup
 
 删除前，核对实际归属、是否仍在使用、必要使用方和保留条件，保护源码、尚未保全的独有工作与提交，以及仍需保留的证据。失败原件保留到调试和验收义务完成，不默认永久留存。明确删除资格并检查活跃使用后，可以采用普通 TTL 保留策略；年龄、目录名或空闲本身，都不能证明任意文件可删。具体操作、兼容部署和恢复边界，由宿主上下文及生命周期负责方维护。
 <!-- chrono-instructions:end -->
-

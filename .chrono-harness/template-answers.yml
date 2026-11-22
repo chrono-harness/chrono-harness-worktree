@@ -1,4 +1,4 @@
-_commit: v0.1.0-alpha.7
+_commit: v0.1.0-alpha.12
 _src_path: gh:chrono-harness/chrono-harness-template
 dev_branch: dev
 features:
@@ -22,6 +22,7 @@ features:
 - worktree
 - verus
 generate_check: false
+project_guide: ''
 repository: chrono-harness/chrono-harness-worktree
 required_check: check
 
