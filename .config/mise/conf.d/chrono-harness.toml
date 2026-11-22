@@ -143,6 +143,10 @@ linux-x64 = { url = "https://github.com/chrono-harness/chrono-harness-worktree/r
 macos-arm64 = { url = "https://github.com/chrono-harness/chrono-harness-worktree/releases/download/v0.1.0-bootstrap.1/chrono-worktree-macos-aarch64", checksum = "sha256:54bb139f9c9ad806d8a89f2ca4dcabcb46083c5b521cfa7d55bb8eb1d2dbd4e5" }
 
 
+[tools.rust]
+version = "1.95.0"
+profile = "minimal"
+
 [tools."http:verus"]
 version = "0.2026.04.24.f8e1704"
 strip_components = 1
