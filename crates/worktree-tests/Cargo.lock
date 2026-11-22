@@ -103,7 +103,6 @@ dependencies = [
 name = "chrono-worktree-tests"
 version = "0.1.0"
 dependencies = [
- "chrono-harness",
  "chrono-worktree",
  "serde_json",
  "vstd",

@@ -1,5 +1,4 @@
-#[path = "../../worktree/src/check_inputs/observation_age.rs"]
-mod observation_age;
+use chrono_worktree::check_observation_age;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
@@ -30,7 +29,7 @@ fn calls_the_selected_workflow_and_distinguishes_staleness_from_failure() {
             Err("workflow age check returned 0: ; stdout=[120]".to_string()),
         ),
     ] {
-        let result = observation_age::check(
+        let result = check_observation_age(
             &context,
             &workflow,
             "/opt/workflow",
@@ -54,7 +53,7 @@ fn calls_the_selected_workflow_and_distinguishes_staleness_from_failure() {
         );
         assert_eq!(result, expected);
     }
-    let result = observation_age::check(
+    let result = check_observation_age(
         &context,
         &workflow,
         "workflow",

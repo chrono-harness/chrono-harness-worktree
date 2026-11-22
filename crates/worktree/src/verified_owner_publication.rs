@@ -1,7 +1,7 @@
 //! 所有者发布的实际身份判断与状态选择；文件系统和编码由调用方提供。
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 

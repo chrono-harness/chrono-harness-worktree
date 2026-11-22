@@ -2,7 +2,8 @@ use chrono_harness::CommandSpec;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
-pub(super) fn check(
+/// Query the configured workflow command and distinguish stale observations from failed checks.
+pub fn check(
     context: &Value,
     workflow: &Value,
     program: &str,

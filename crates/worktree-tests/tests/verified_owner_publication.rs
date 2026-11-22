@@ -4,10 +4,10 @@
 #[path = "../../worktree/src/verified_owner_publication.rs"]
 mod policy;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
-#[cfg(not(verus_keep_ghost))]
 use chrono_worktree::verified_owner_publication as policy;
 use policy::{Binding, Intent, Stage, Staged};
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
