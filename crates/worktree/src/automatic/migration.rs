@@ -358,10 +358,24 @@ impl Manager {
         // Ordinary migration has already admitted the target's executable policy.
         // Explicit adoption executes the caller's policy. Its target supplies
         // only the fixed artifact declarations and registered policy paths.
-        let (target_config, target_filemap) =
-            chrono_judge_registration::read_custody_inputs(&host_config, |path| {
-                r.blob(&target, &head, path)
-            })?;
+        let target_config = chrono_harness::facts::selected_config_with(&host_config, |path| {
+            r.blob(&target, &head, path)
+        })?;
+        let client = r.registration()?;
+        let binding: Value =
+            client.query(&value!({"operation":"custody-config","config":target_config}))?;
+        let filemap_path = binding["filemap_path"]
+            .as_str()
+            .ok_or("registration custody FILEMAP path missing")?;
+        if target_config["registries"]["filemap"] != filemap_path {
+            return Err("registration custody FILEMAP path differs".into());
+        }
+        let target_filemap: Value = decode(&r.blob(&target, &head, filemap_path)?)?;
+        let checked: Value =
+            client.query(&value!({"operation":"custody-filemap","filemap":target_filemap}))?;
+        if checked["valid"] != true {
+            return Err("registration refused custody FILEMAP".into());
+        }
         artifact_disposal::registered(
             &self
                 .inputs

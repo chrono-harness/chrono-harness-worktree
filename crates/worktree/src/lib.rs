@@ -91,6 +91,8 @@ mod reconstruct;
 #[cfg(not(verus_keep_ghost))]
 mod recovery;
 #[cfg(not(verus_keep_ghost))]
+mod registration;
+#[cfg(not(verus_keep_ghost))]
 mod remote;
 #[cfg(not(verus_keep_ghost))]
 mod start;
@@ -142,6 +144,8 @@ pub struct Config {
     pub agent_identity_env: Option<String>,
     #[serde(default)]
     pub check_inputs: Option<check_inputs::Policy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registration_program: Option<String>,
     pub host_config: String,
     pub remote: String,
     pub git: Git,

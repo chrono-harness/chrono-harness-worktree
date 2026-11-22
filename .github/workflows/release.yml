@@ -1,0 +1,83 @@
+name: Release chrono-worktree
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify release branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_oid=$(git rev-parse HEAD)
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            test "$source_oid" = "$(git rev-parse refs/remotes/origin/main)"
+          elif [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+[.][0-9]+[.][0-9]+-[0-9A-Za-z.-]+$ ]]; then
+            git merge-base --is-ancestor "$source_oid" refs/remotes/origin/dev
+          else
+            echo "Unsupported release tag: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+  build:
+    needs: source
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15
+            platform: macos-aarch64
+          - runner: ubuntu-24.04
+            platform: linux-x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build and exercise the release binary
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/target
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --manifest-path crates/worktree/Cargo.toml
+          binary="$CARGO_TARGET_DIR/release/chrono-worktree"
+          "$binary" --version | grep -Ex 'chrono-worktree [0-9]+[.][0-9]+[.][0-9]+'
+          "$binary" --help | grep -F 'chrono-worktree start'
+          mkdir "$RUNNER_TEMP/dist"
+          cp "$CARGO_TARGET_DIR/release/chrono-worktree" "$RUNNER_TEMP/dist/chrono-worktree-$PLATFORM"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ matrix.platform }}
+          path: ${{ runner.temp }}/dist/
+          if-no-files-found: error
+          retention-days: 1
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093b
+        with:
+          path: ${{ runner.temp }}/dist
+          merge-multiple: true
+      - name: Publish binaries and their checksums
+        working-directory: ${{ runner.temp }}/dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum chrono-worktree-macos-aarch64 chrono-worktree-linux-x86_64 > SHA256SUMS
+          flags=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}" \
+            chrono-worktree-macos-aarch64 chrono-worktree-linux-x86_64 SHA256SUMS

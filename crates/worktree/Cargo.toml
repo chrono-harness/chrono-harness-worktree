@@ -23,7 +23,6 @@ bench = false
 vstd = "=0.0.0-2026-04-20-1748"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "a1cff08f74d996d618372f20adc203d1b5904d50" }
-chrono-judge-registration = { git = "https://github.com/chrono-harness/chrono-harness-judge-registration.git", rev = "76530cce04ad04ebda2f71a16a8a51f930c2daa8" }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["raw_value"] }
 tempfile = "3"

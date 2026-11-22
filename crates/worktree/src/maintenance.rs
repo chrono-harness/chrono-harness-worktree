@@ -20,14 +20,14 @@ pub fn retained_reference_ancestor_required(reference_matches: bool, allow_advan
 }
 
 #[cfg(not(verus_keep_ghost))]
+use crate::registration::Registrations;
+#[cfg(not(verus_keep_ghost))]
 use crate::{
     recovery::{self, ExpectedResult, state_bytes},
     start::{self, Runner},
 };
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::{decode, facts, json, relative_path, sha256};
-#[cfg(not(verus_keep_ghost))]
-use chrono_judge_registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
 #[cfg(not(verus_keep_ghost))]
@@ -523,7 +523,11 @@ pub(crate) fn run(args: &[String]) -> Result<Value, String> {
 #[cfg(not(verus_keep_ghost))]
 pub(crate) fn artifacts(registrations: &Registrations, paths: &[&str]) -> Result<(), String> {
     let paths: Vec<_> = paths.iter().map(|p| (*p).to_string()).collect();
-    if !chrono_judge_registration::nonartifact_paths(registrations.config(), &paths).is_empty() {
+    if !registrations
+        .client
+        .nonartifact_paths(registrations.config(), &paths)?
+        .is_empty()
+    {
         return Err("maintenance input/output lacks a registered artifact owner".into());
     }
     Ok(())

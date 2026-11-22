@@ -1,4 +1,5 @@
 //! Finite current custody of released file aliases; original outcomes remain data.
+use crate::registration::Registrations;
 use crate::{
     automatic::EvidenceExclusion,
     maintenance,
@@ -6,7 +7,6 @@ use crate::{
     start::{self, Runner},
 };
 use chrono_harness::{file_identity, no_symlink_parents, relative_path};
-use chrono_judge_registration::Registrations;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
