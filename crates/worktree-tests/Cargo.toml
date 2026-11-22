@@ -1,0 +1,18 @@
+[package]
+name = "chrono-worktree-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autotests = false
+
+[dependencies]
+chrono-worktree = { path = "../worktree" }
+chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "a1cff08f74d996d618372f20adc203d1b5904d50" }
+
+[[test]]
+name = "verified_attention"
+path = "tests/verified_attention.rs"
+
+[[test]]
+name = "verified_owner_publication"
+path = "tests/verified_owner_publication.rs"
