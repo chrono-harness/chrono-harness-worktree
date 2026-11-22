@@ -80,42 +80,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chrono-judge-filemap"
-version = "0.1.0"
-source = "git+https://github.com/chrono-harness/chrono-harness-judge-filemap.git?rev=545c03a0df4259921d927e3e9fffd9fa2b65c68d#545c03a0df4259921d927e3e9fffd9fa2b65c68d"
-dependencies = [
- "chrono-harness",
- "chrono-judge-mixed",
- "chrono-judge-registration",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "chrono-judge-mixed"
-version = "0.1.0"
-source = "git+https://github.com/chrono-harness/chrono-harness-judge-mixed.git?rev=3d8cdc0d062b123a31aecddd5fb0fedee0a914ea#3d8cdc0d062b123a31aecddd5fb0fedee0a914ea"
-dependencies = [
- "chrono-harness",
- "chrono-judge-registration",
- "serde_json",
-]
-
-[[package]]
-name = "chrono-judge-projects"
-version = "0.1.0"
-source = "git+https://github.com/chrono-harness/chrono-harness-judge-projects.git?rev=01713b83aec1bef595770b28dc8a4c8f12f67e4b#01713b83aec1bef595770b28dc8a4c8f12f67e4b"
-dependencies = [
- "chrono-harness",
- "chrono-judge-filemap",
- "chrono-judge-registration",
- "chrono-judge-routes",
- "serde",
- "serde_json",
- "tracing",
-]
-
-[[package]]
 name = "chrono-judge-registration"
 version = "0.1.0"
 source = "git+https://github.com/chrono-harness/chrono-harness-judge-registration.git?rev=76530cce04ad04ebda2f71a16a8a51f930c2daa8#76530cce04ad04ebda2f71a16a8a51f930c2daa8"
@@ -127,38 +91,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "chrono-judge-routes"
-version = "0.1.0"
-source = "git+https://github.com/chrono-harness/chrono-harness-judge-routes.git?rev=de64456d6571db07ead2dcc2476e7adee551a955#de64456d6571db07ead2dcc2476e7adee551a955"
-dependencies = [
- "chrono-harness",
- "chrono-judge-filemap",
- "chrono-judge-registration",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "chrono-judge-workflow"
-version = "0.1.0"
-source = "git+https://github.com/chrono-harness/chrono-harness-judge-workflow.git?rev=780f1ec2a48626f9eee19b1cb47fbbc55f3c5895#780f1ec2a48626f9eee19b1cb47fbbc55f3c5895"
-dependencies = [
- "chrono-harness",
- "chrono-judge-filemap",
- "chrono-judge-projects",
- "chrono-judge-registration",
- "chrono-judge-routes",
- "serde_json",
- "time",
-]
-
-[[package]]
 name = "chrono-worktree"
 version = "0.1.0"
 dependencies = [
  "chrono-harness",
  "chrono-judge-registration",
- "chrono-judge-workflow",
  "libc",
  "serde",
  "serde_json",

@@ -17,6 +17,8 @@ pub fn full_paths_distinct(origin: &str, context: &str, manifest: &str) -> (vali
 #[cfg(not(verus_keep_ghost))]
 use crate::{Config, configuration, start};
 #[cfg(not(verus_keep_ghost))]
+mod observation_age;
+#[cfg(not(verus_keep_ghost))]
 use chrono_harness::{
     decode, facts, file_identity, no_symlink_parents,
     prepared::{self, Context, InputRequest, PreparedCheck, Selection},
@@ -49,10 +51,17 @@ pub enum Policy {
 #[serde(deny_unknown_fields)]
 #[cfg(not(verus_keep_ghost))]
 pub struct FullPolicy {
+    #[serde(default = "default_observation_age_program")]
+    pub observation_age_program: String,
     pub origin_path: String,
     pub context_path: String,
     pub collection_manifest: String,
     pub roles: BTreeMap<String, String>,
+}
+
+#[cfg(not(verus_keep_ghost))]
+fn default_observation_age_program() -> String {
+    "chrono-judge-workflow".into()
 }
 
 #[cfg(not(verus_keep_ghost))]
@@ -342,25 +351,30 @@ fn produce(
                                         .into(),
                                 );
                             }
-                            match chrono_judge_workflow::observation_age(
-                                &previous,
-                                registrations.workflow(),
-                            ) {
-                                Ok(_) => {}
-                                Err(e) if e.starts_with("E_BRANCH_STALE:") => {}
-                                Err(e) => return Err(format!("E_LOCAL_CONTEXT: {e}")),
-                            }
+                            let fresh = |context: &Value| {
+                                observation_age::check(
+                                    context,
+                                    registrations.workflow(),
+                                    &p.observation_age_program,
+                                    r.config.timeout_seconds,
+                                    r.config.output_limit_bytes,
+                                    &r.environment,
+                                    |command, input| {
+                                        let result =
+                                            chrono_harness::run_process(root, command, input)?;
+                                        Ok((
+                                            result.exit_code,
+                                            result.stdout_bytes,
+                                            result.stderr_bytes,
+                                        ))
+                                    },
+                                )
+                            };
+                            fresh(&previous).map_err(|e| format!("E_LOCAL_CONTEXT: {e}"))?;
                             let mut comparison = previous.clone();
                             comparison["observed_at"] = ctx["observed_at"].clone();
-                            if comparison == ctx {
-                                match chrono_judge_workflow::observation_age(
-                                    &ctx,
-                                    registrations.workflow(),
-                                ) {
-                                    Ok(_) => ctx = previous,
-                                    Err(e) if e.starts_with("E_BRANCH_STALE:") => {}
-                                    Err(e) => return Err(e),
-                                }
+                            if comparison == ctx && fresh(&ctx)? {
+                                ctx = previous;
                             }
                         }
                         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
