@@ -91,7 +91,9 @@ pub(crate) fn execute(
     }
     let config_path = r.config.host_config.clone();
     let (registrations, _) = start::registrations(r, &o.root, &p.candidate, &config_path)?;
-    if !chrono_judge_registration::nonartifact_paths(registrations.config(), &[input.path.clone()])
+    if !registrations
+        .client
+        .nonartifact_paths(registrations.config(), std::slice::from_ref(&input.path))?
         .is_empty()
     {
         return Err("reconstruction plan lacks a registered artifact owner".into());

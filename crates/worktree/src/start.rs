@@ -81,14 +81,14 @@ pub fn select_report_input_scope<S, T, R, E, O, P, C>(
 }
 
 #[cfg(not(verus_keep_ghost))]
+use crate::registration::Registrations;
+#[cfg(not(verus_keep_ghost))]
 use crate::{Config, Start};
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::{
     CommandSpec, ProcessResult, facts, no_symlink_parents, observation, run_process_observed,
     sha256,
 };
-#[cfg(not(verus_keep_ghost))]
-use chrono_judge_registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json as value};
 #[cfg(not(verus_keep_ghost))]
@@ -104,6 +104,8 @@ use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 #[cfg(not(verus_keep_ghost))]
 pub(crate) struct Runner {
+    registration_root: PathBuf,
+    registration_client: Option<Arc<crate::registration::Client>>,
     pub(crate) config: Config,
     pub(crate) birth_lease: Option<crate::ownership::Lease>,
     pub(crate) coordinator_inputs: Option<chrono_harness::retained_artifacts::retention::ReadScope>,
@@ -123,6 +125,18 @@ pub(crate) struct CheckoutIdentity {
 }
 #[cfg(not(verus_keep_ghost))]
 impl Runner {
+    pub(crate) fn registration(&mut self) -> Result<Arc<crate::registration::Client>, String> {
+        if let Some(client) = &self.registration_client {
+            return Ok(Arc::clone(client));
+        }
+        let client = Arc::new(crate::registration::Client::bind(
+            &self.registration_root,
+            &self.config,
+        )?);
+        self.registration_client = Some(Arc::clone(&client));
+        Ok(client)
+    }
+
     pub(crate) fn command(&mut self, root: &Path, args: &[&str]) -> Result<ProcessResult, String> {
         self.input(root, args, &[])
     }
@@ -477,7 +491,11 @@ pub(crate) fn untracked(r: &mut Runner, target: &Path, config: &Value) -> Result
     let observed: Vec<_> = paths(r.literal_inventory(target, &args)?)?
         .into_iter()
         .collect();
-    if !chrono_judge_registration::nonartifact_paths(config, &observed).is_empty() {
+    if !r
+        .registration()?
+        .nonartifact_paths(config, &observed)?
+        .is_empty()
+    {
         return Err("checkout has unregistered files; preserve it for recovery".into());
     }
     Ok(())
@@ -846,6 +864,8 @@ pub(crate) fn with_report_for_consumer<T>(
         }
     });
     let mut runner = Runner {
+        registration_root: root.to_path_buf(),
+        registration_client: None,
         config,
         birth_lease: None,
         coordinator_inputs: None,
@@ -984,9 +1004,7 @@ pub(crate) fn registrations(
     let snapshot = facts::registry_snapshot_with_batches(config_path, |paths| {
         r.registry_blobs(root, head, paths)
     })?;
-    let registrations = Registrations::load(&snapshot.values, config_path)?;
-    Ok((
-        registrations,
-        chrono_harness::wire::digest(&value!(snapshot.values))?,
-    ))
+    let digest = chrono_harness::wire::digest(&value!(snapshot.values))?;
+    let registrations = Registrations::load(r.registration()?, snapshot.values, config_path)?;
+    Ok((registrations, digest))
 }

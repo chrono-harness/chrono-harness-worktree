@@ -304,7 +304,10 @@ impl Manager {
         let (regs, _) = start::registrations(r, &e.path, &head, &host_config)?;
         let tracked = start::paths(r.git(&e.path, &["ls-files", "-z"])?)?;
         let tracked_paths: Vec<_> = tracked.iter().cloned().collect();
-        if chrono_judge_registration::nonartifact_paths(regs.config(), &tracked_paths).len()
+        if regs
+            .client
+            .nonartifact_paths(regs.config(), &tracked_paths)?
+            .len()
             != tracked.len()
         {
             return Err(
@@ -318,10 +321,9 @@ impl Manager {
         let mut args = vec!["ls-files", "--others", "-z", "--", "."];
         args.extend(exclusions.iter().map(String::as_str));
         paths.extend(start::paths(r.literal_inventory(&e.path, &args)?)?);
-        let selected = chrono_judge_registration::nonartifact_paths(
-            regs.config(),
-            &paths.into_iter().collect::<Vec<_>>(),
-        );
+        let selected = regs
+            .client
+            .nonartifact_paths(regs.config(), &paths.into_iter().collect::<Vec<_>>())?;
         let mut input = Vec::new();
         for path in selected {
             input.extend_from_slice(path.as_bytes());

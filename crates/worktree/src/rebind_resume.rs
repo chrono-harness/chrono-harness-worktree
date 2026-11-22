@@ -1,4 +1,5 @@
 //! Resume only the explicit old plan and preserved pre-effect identity.
+use crate::registration::Registrations;
 use crate::{
     maintenance,
     rebind::Binding,
@@ -6,7 +7,6 @@ use crate::{
     start::Runner,
 };
 use chrono_harness::{decode, facts, sha256, wire};
-use chrono_judge_registration::Registrations;
 use serde::Deserialize;
 use serde_json::{Value, json as value};
 use std::path::{Path, PathBuf};

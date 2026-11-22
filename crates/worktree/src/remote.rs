@@ -1,10 +1,10 @@
 //! Explicit remote branch disposal with saved-work checks and an exact push lease.
+use crate::registration::Registrations;
 use crate::{
     maintenance::{Retention, saved_commit},
     start::Runner,
 };
 use chrono_harness::facts;
-use chrono_judge_registration::Registrations;
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::Path};
 

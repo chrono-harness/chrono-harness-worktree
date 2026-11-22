@@ -427,6 +427,8 @@ impl EvidenceExclusion {
     }
 }
 #[cfg(not(verus_keep_ghost))]
+use crate::registration::Registrations;
+#[cfg(not(verus_keep_ghost))]
 use crate::verified_owner_publication::{PolicyNamespace, policy_namespace_matches};
 #[cfg(not(verus_keep_ghost))]
 use crate::{
@@ -437,8 +439,6 @@ use crate::{
 };
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::{CommandSpec, decode, facts, json, no_symlink_parents, relative_path, sha256};
-#[cfg(not(verus_keep_ghost))]
-use chrono_judge_registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 pub use producer::{RetainedArtifact, TemporaryHost};
 #[cfg(not(verus_keep_ghost))]
