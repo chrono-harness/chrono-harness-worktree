@@ -73,6 +73,8 @@ pub use automatic::{RetainedArtifact, TemporaryHost};
 #[cfg(not(verus_keep_ghost))]
 mod check_inputs;
 #[cfg(not(verus_keep_ghost))]
+pub use check_inputs::observation_age::check as check_observation_age;
+#[cfg(not(verus_keep_ghost))]
 mod evidence_retirement;
 #[cfg(not(verus_keep_ghost))]
 mod maintenance;

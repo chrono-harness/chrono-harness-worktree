@@ -9,7 +9,6 @@ autotests = false
 vstd = "=0.0.0-2026-04-20-1748"
 serde_json = "1"
 chrono-worktree = { path = "../worktree" }
-chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "a1cff08f74d996d618372f20adc203d1b5904d50" }
 
 [[test]]
 name = "verified_attention"

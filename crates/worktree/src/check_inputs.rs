@@ -16,7 +16,7 @@ pub fn full_paths_distinct(origin: &str, context: &str, manifest: &str) -> (vali
 #[cfg(not(verus_keep_ghost))]
 use crate::{Config, configuration, start};
 #[cfg(not(verus_keep_ghost))]
-mod observation_age;
+pub(crate) mod observation_age;
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::{
     decode, facts, file_identity, no_symlink_parents,
