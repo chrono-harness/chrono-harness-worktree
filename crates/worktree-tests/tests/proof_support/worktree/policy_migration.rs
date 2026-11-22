@@ -1,4 +1,6 @@
 #[cfg(verus_keep_ghost)]
+use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(verus_keep_ghost)]
 use super::{expect, policy};
 
 #[cfg(verus_keep_ghost)]
@@ -110,20 +112,20 @@ fn current_policy_handoff_keeps_one_binding_and_no_original_chain() {
 fn current_policy_binding_requires_exact_inputs_and_preserves_error_priority() {
     expect(policy::adopted_policy_binding_error(true, true, true, true, true, true).is_none());
     let digest = policy::adopted_policy_binding_error(false, true, true, true, true, true);
-    expect(policy::equal_text(digest.unwrap(), "invalid current adopted policy binding"));
+    expect(<&str>::exec_eq(digest.unwrap(), "invalid current adopted policy binding"));
     let keys = policy::adopted_policy_binding_error(true, false, true, true, true, true);
-    expect(policy::equal_text(keys.unwrap(), "invalid current adopted policy binding"));
+    expect(<&str>::exec_eq(keys.unwrap(), "invalid current adopted policy binding"));
     let inputs = policy::adopted_policy_binding_error(true, true, false, true, true, true);
-    expect(policy::equal_text(inputs.unwrap(), "invalid current adopted policy binding"));
+    expect(<&str>::exec_eq(inputs.unwrap(), "invalid current adopted policy binding"));
     let source_keys = policy::adopted_policy_binding_error(true, true, true, false, true, true);
-    expect(policy::equal_text(source_keys.unwrap(), "adopted cleanup source does not bind policy inputs"));
+    expect(<&str>::exec_eq(source_keys.unwrap(), "adopted cleanup source does not bind policy inputs"));
     let source_digest = policy::adopted_policy_binding_error(true, true, true, true, false, true);
-    expect(policy::equal_text(source_digest.unwrap(), "adopted cleanup source does not bind policy inputs"));
+    expect(<&str>::exec_eq(source_digest.unwrap(), "adopted cleanup source does not bind policy inputs"));
     let mismatch = policy::adopted_policy_binding_error(true, true, true, true, true, false);
-    expect(policy::equal_text(mismatch.unwrap(), "current adopted policy digest differs from its committed inputs"));
+    expect(<&str>::exec_eq(mismatch.unwrap(), "current adopted policy digest differs from its committed inputs"));
     let all_invalid = policy::adopted_policy_binding_error(false, false, false, false, false, false);
-    expect(policy::equal_text(all_invalid.unwrap(), "invalid current adopted policy binding"));
+    expect(<&str>::exec_eq(all_invalid.unwrap(), "invalid current adopted policy binding"));
     let invalid_source = policy::adopted_policy_binding_error(true, true, true, false, false, false);
-    expect(policy::equal_text(invalid_source.unwrap(), "adopted cleanup source does not bind policy inputs"));
+    expect(<&str>::exec_eq(invalid_source.unwrap(), "adopted cleanup source does not bind policy inputs"));
 }
 }

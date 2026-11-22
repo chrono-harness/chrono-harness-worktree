@@ -1,8 +1,8 @@
 #[cfg(verus_keep_ghost)]
+use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(verus_keep_ghost)]
 use super::policy as absence_policy;
 
-#[cfg(verus_keep_ghost)]
-extern crate chrono_identifiers as absence_identifiers;
 
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
@@ -27,7 +27,7 @@ fn require_selected_source(actual: Option<&str>, expected: &str)
     requires match actual { Some(actual) => actual@ == expected@, None => false },
 {
     match actual {
-        Some(actual) => require_absence_expectation(absence_identifiers::equal_text(actual, expected)),
+        Some(actual) => require_absence_expectation(<&str>::exec_eq(actual, expected)),
         None => require_absence_expectation(false),
     }
 }
@@ -123,30 +123,30 @@ fn admission_handoff_orders_recovery_and_preserves_full_errors() {
     let (trace, result) = absence_policy::admission_handoff(Vec::<u8>::new(),
         handoff_ok, reload_error, protect_ok);
     assert(trace@ =~= seq![1u8, 3]);
-    require_absence_expectation(absence_identifiers::equal_bytes(&trace, &[1u8, 3]));
+    require_absence_expectation(<&[u8]>::exec_eq(&trace, &[1u8, 3]));
     require_absence_expectation(result.is_ok());
 
     let (trace, result) = absence_policy::admission_handoff(Vec::<u8>::new(),
         handoff_error, reload_ok, protect_ok);
     assert(trace@ =~= seq![1u8, 2, 3]);
-    require_absence_expectation(absence_identifiers::equal_bytes(&trace, &[1u8, 2, 3]));
+    require_absence_expectation(<&[u8]>::exec_eq(&trace, &[1u8, 2, 3]));
     require_absence_expectation(result.is_ok());
 
     let (trace, result) = absence_policy::admission_handoff(Vec::<u8>::new(),
         handoff_error, reload_error, protect_ok);
     assert(trace@ =~= seq![1u8, 2]);
-    require_absence_expectation(absence_identifiers::equal_bytes(&trace, &[1u8, 2]));
+    require_absence_expectation(<&[u8]>::exec_eq(&trace, &[1u8, 2]));
     match result {
-        Err(error) => require_absence_expectation(absence_identifiers::equal_text(&error, "原交接错误\0完整")),
+        Err(error) => require_absence_expectation(<&str>::exec_eq(&error, "原交接错误\0完整")),
         Ok(()) => require_absence_expectation(false),
     }
 
     let (trace, result) = absence_policy::admission_handoff(Vec::<u8>::new(),
         handoff_ok, reload_ok, protect_error);
     assert(trace@ =~= seq![1u8, 3]);
-    require_absence_expectation(absence_identifiers::equal_bytes(&trace, &[1u8, 3]));
+    require_absence_expectation(<&[u8]>::exec_eq(&trace, &[1u8, 3]));
     match result {
-        Err(error) => require_absence_expectation(absence_identifiers::equal_text(&error, "必要保护失败\0完整")),
+        Err(error) => require_absence_expectation(<&str>::exec_eq(&error, "必要保护失败\0完整")),
         Ok(()) => require_absence_expectation(false),
     }
 }
@@ -182,21 +182,21 @@ fn enrollment_publication_skips_only_the_shrinking_preparation_and_stops_on_firs
     let (trace, result) = absence_policy::publish_enrollment_record(Vec::<u8>::new(), true,
         before_ok, write_ok, after_ok);
     assert(trace@ =~= seq![1u8, 2, 3]);
-    require_absence_expectation(absence_identifiers::equal_bytes(&trace, &[1u8, 2, 3]));
+    require_absence_expectation(<&[u8]>::exec_eq(&trace, &[1u8, 2, 3]));
     require_absence_expectation(result.is_ok());
     let (trace, result) = absence_policy::publish_enrollment_record(Vec::<u8>::new(), false,
         forbidden, write_ok, after_ok);
     assert(trace@ =~= seq![2u8, 3]);
-    require_absence_expectation(absence_identifiers::equal_bytes(&trace, &[2u8, 3]));
+    require_absence_expectation(<&[u8]>::exec_eq(&trace, &[2u8, 3]));
     require_absence_expectation(result.is_ok());
     let (trace, result) = absence_policy::publish_enrollment_record(Vec::<u8>::new(), true,
         before_error, write_ok, after_ok);
     assert(trace@ =~= seq![1u8]);
     let expected = [1u8];
     assert(expected@ =~= seq![1u8]);
-    require_absence_expectation(absence_identifiers::equal_bytes(&trace, &expected));
+    require_absence_expectation(<&[u8]>::exec_eq(&trace, &expected));
     match result {
-        Err(error) => require_absence_expectation(absence_identifiers::equal_text(&error, "新增引用保护失败\0原件")),
+        Err(error) => require_absence_expectation(<&str>::exec_eq(&error, "新增引用保护失败\0原件")),
         Ok(()) => require_absence_expectation(false),
     }
     let (trace, result) = absence_policy::publish_enrollment_record(Vec::<u8>::new(), false,
@@ -204,17 +204,17 @@ fn enrollment_publication_skips_only_the_shrinking_preparation_and_stops_on_firs
     assert(trace@ =~= seq![2u8]);
     let expected = [2u8];
     assert(expected@ =~= seq![2u8]);
-    require_absence_expectation(absence_identifiers::equal_bytes(&trace, &expected));
+    require_absence_expectation(<&[u8]>::exec_eq(&trace, &expected));
     match result {
-        Err(error) => require_absence_expectation(absence_identifiers::equal_text(&error, "账本写入失败\0原件")),
+        Err(error) => require_absence_expectation(<&str>::exec_eq(&error, "账本写入失败\0原件")),
         Ok(()) => require_absence_expectation(false),
     }
     let (trace, result) = absence_policy::publish_enrollment_record(Vec::<u8>::new(), false,
         before_ok, write_ok, after_error);
     assert(trace@ =~= seq![2u8, 3]);
-    require_absence_expectation(absence_identifiers::equal_bytes(&trace, &[2u8, 3]));
+    require_absence_expectation(<&[u8]>::exec_eq(&trace, &[2u8, 3]));
     match result {
-        Err(error) => require_absence_expectation(absence_identifiers::equal_text(&error, "引用收窄失败\0原件")),
+        Err(error) => require_absence_expectation(<&str>::exec_eq(&error, "引用收窄失败\0原件")),
         Ok(()) => require_absence_expectation(false),
     }
 }
@@ -234,11 +234,11 @@ fn absent_cache_probe_requires_maintenance_pending_cache_and_the_original_exclus
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn absent_cache_observation_preserves_unknown_task_and_unclaimed_removal() {
     let observation = absence_policy::missing_cache_observation();
-    require_absence_expectation(absence_identifiers::equal_text(observation.status, "preserved"));
-    require_absence_expectation(absence_identifiers::equal_text(observation.checkout_presence, "absent"));
-    require_absence_expectation(absence_identifiers::equal_text(observation.metadata_presence, "absent"));
-    require_absence_expectation(absence_identifiers::equal_text(observation.task_completion, "unknown"));
-    require_absence_expectation(absence_identifiers::equal_text(observation.worktree_removal, "not-claimed"));
+    require_absence_expectation(<&str>::exec_eq(observation.status, "preserved"));
+    require_absence_expectation(<&str>::exec_eq(observation.checkout_presence, "absent"));
+    require_absence_expectation(<&str>::exec_eq(observation.metadata_presence, "absent"));
+    require_absence_expectation(<&str>::exec_eq(observation.task_completion, "unknown"));
+    require_absence_expectation(<&str>::exec_eq(observation.worktree_removal, "not-claimed"));
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]

@@ -1,4 +1,6 @@
 #[cfg(verus_keep_ghost)]
+use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(verus_keep_ghost)]
 use super::policy;
 
 #[cfg(verus_keep_ghost)]
@@ -37,12 +39,12 @@ fn maintenance_keeps_complete_root_text_and_repeated_values() {
     let roots = policy::maintenance_exclusions(
         "/coordinator λ/source\n".to_string(), "/caller λ/source\0\n".to_string());
     expect(roots.len() == 2);
-    expect(policy::equal_text(roots[0].as_str(), "/coordinator λ/source\n"));
-    expect(policy::equal_text(roots[1].as_str(), "/caller λ/source\0\n"));
+    expect(<&str>::exec_eq(roots[0].as_str(), "/coordinator λ/source\n"));
+    expect(<&str>::exec_eq(roots[1].as_str(), "/caller λ/source\0\n"));
     let same = policy::maintenance_exclusions("".to_string(), "".to_string());
     expect(same.len() == 2);
-    expect(policy::equal_text(same[0].as_str(), ""));
-    expect(policy::equal_text(same[1].as_str(), ""));
+    expect(<&str>::exec_eq(same[0].as_str(), ""));
+    expect(<&str>::exec_eq(same[1].as_str(), ""));
 }
 
 fn retention_phase_case(complete: bool, unprotected: usize, succeeds: bool,
@@ -67,7 +69,7 @@ fn retention_phase_case(complete: bool, unprotected: usize, succeeds: bool,
     { ((2, state.1 && state.0 == 1 && value == payload), 22) };
     let failed = |state: (u8, bool), error: String| -> (out: ((u8, bool), u64))
         ensures out == ((3u8, state.1 && state.0 == 1u8 && error@ == message@), 23u64),
-    { ((3, state.1 && state.0 == 1 && policy::equal_text(error.as_str(), message)), 23) };
+    { ((3, state.1 && state.0 == 1 && <&str>::exec_eq(error.as_str(), message)), 23) };
     let deferred = |state: (u8, bool)| -> (out: ((u8, bool), u64))
         ensures out == ((4u8, state.1 && state.0 == 0u8), 24u64),
     { ((4, state.1 && state.0 == 0), 24) };
@@ -170,7 +172,7 @@ fn activation_case(query_result: (i32, i32), path: (bool, bool, bool, u32, u32),
         Ok(()) => expect(expected.1),
         Err(error) => {
             expect(!expected.1);
-            expect(policy::equal_text(error.as_str(), expected.2));
+            expect(<&str>::exec_eq(error.as_str(), expected.2));
         },
     }
 }

@@ -1,11 +1,8 @@
 //! Produce real Git worktrees and observations; governance remains with the judges.
 #![allow(unexpected_cfgs)]
-#[cfg(verus_keep_ghost)]
-use super::identifiers::equal_text;
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verified_identifiers::equal_text;
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 verus! {
@@ -30,20 +27,20 @@ pub fn successful_report_status(status: Option<&str>) -> (successful: bool)
 {
     match status {
         None => false,
-        Some(text) => equal_text(text, "created")
-            || equal_text(text, "reconstructed")
-            || equal_text(text, "recovered")
-            || equal_text(text, "cleaned")
-            || equal_text(text, "observed")
-            || equal_text(text, "rebound")
-            || equal_text(text, "finished")
-            || equal_text(text, "maintained")
-            || equal_text(text, "maintenance-requested")
-            || equal_text(text, "maintenance-idle-exit")
-            || equal_text(text, "imported")
-            || equal_text(text, "migrated")
-            || equal_text(text, "owner-deployed")
-            || equal_text(text, "used"),
+        Some(text) => <&str>::exec_eq(text, "created")
+            || <&str>::exec_eq(text, "reconstructed")
+            || <&str>::exec_eq(text, "recovered")
+            || <&str>::exec_eq(text, "cleaned")
+            || <&str>::exec_eq(text, "observed")
+            || <&str>::exec_eq(text, "rebound")
+            || <&str>::exec_eq(text, "finished")
+            || <&str>::exec_eq(text, "maintained")
+            || <&str>::exec_eq(text, "maintenance-requested")
+            || <&str>::exec_eq(text, "maintenance-idle-exit")
+            || <&str>::exec_eq(text, "imported")
+            || <&str>::exec_eq(text, "migrated")
+            || <&str>::exec_eq(text, "owner-deployed")
+            || <&str>::exec_eq(text, "used"),
     }
 }
 }

@@ -2,6 +2,8 @@
 #![allow(unexpected_cfgs)]
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::verus;
+#[cfg(not(verus_keep_ghost))]
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
@@ -433,8 +435,6 @@ use crate::{
     ownership::Lease,
     start::{self, Runner},
 };
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verified_identifiers::{equal_bytes, equal_text};
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::{CommandSpec, decode, facts, json, no_symlink_parents, relative_path, sha256};
 #[cfg(not(verus_keep_ghost))]
@@ -1285,14 +1285,14 @@ impl PolicyInputs {
         let anchor = &self.policy.coordinator_root;
         let head = r.oid(anchor, "HEAD")?;
         let (config, bytes) = crate::configuration(anchor, &self.config_path)?;
-        if !equal_bytes(&r.blob(anchor, &head, &self.config_path)?, &bytes) {
+        if !<&[u8]>::exec_eq(&r.blob(anchor, &head, &self.config_path)?, &bytes) {
             return Err("coordinator configuration differs from committed bytes".into());
         }
         let path = config
             .automatic_cleanup
             .ok_or("coordinator cleanup ownership disappeared")?;
         let bytes = fs::read(no_symlink_parents(anchor, &path)?).map_err(|e| e.to_string())?;
-        if !equal_bytes(&r.blob(anchor, &head, &path)?, &bytes) {
+        if !<&[u8]>::exec_eq(&r.blob(anchor, &head, &path)?, &bytes) {
             return Err("coordinator cleanup policy differs from committed bytes".into());
         }
         let mut observed: Policy = decode(&bytes)?;
@@ -2833,10 +2833,10 @@ impl Manager {
             (self.inputs.config_path.clone(), Some(sha256(&config_bytes))),
             (self.inputs.policy_path.clone(), Some(sha256(&policy_bytes))),
         ]);
-        if !equal_bytes(
+        if !<&[u8]>::exec_eq(
             &serde_json::to_vec(&expected).map_err(|e| e.to_string())?,
             &serde_json::to_vec(&binding.inputs).map_err(|e| e.to_string())?,
-        ) || !equal_text(&sha256(&policy_bytes), &binding.policy_sha256)
+        ) || !<&str>::exec_eq(&sha256(&policy_bytes), &binding.policy_sha256)
         {
             return Err("adopted worktree policy does not match its retained inputs".into());
         }
@@ -2847,7 +2847,7 @@ impl Manager {
             automatic_cleanup: Option<String>,
         }
         let config: AdoptedPolicyAddresses = decode(&config_bytes)?;
-        if !equal_bytes(
+        if !<&[u8]>::exec_eq(
             &serde_json::to_vec(&config.automatic_cleanup).map_err(|e| e.to_string())?,
             &serde_json::to_vec(&Some(&self.inputs.policy_path)).map_err(|e| e.to_string())?,
         ) {

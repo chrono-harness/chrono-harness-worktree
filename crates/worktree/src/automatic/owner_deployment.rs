@@ -1,11 +1,8 @@
 //! Selected coordinator bytes change only under original affected enrollment EX leases.
 #![allow(unexpected_cfgs)]
-#[cfg(verus_keep_ghost)]
-use super::super::identifiers::equal_text;
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verified_identifiers::equal_text;
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::verus;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -14,14 +11,14 @@ verus! {
 pub fn known_absent_enrollment(cache_only: bool, kind: &str) -> (known: bool)
     ensures known == (!cache_only && (kind@ == "birth"@ || kind@ == "import"@)),
 {
-    !cache_only && (equal_text(kind, "birth") || equal_text(kind, "import"))
+    !cache_only && (<&str>::exec_eq(kind, "birth") || <&str>::exec_eq(kind, "import"))
 }
 
 pub fn absent_attachment_conflict(path_matches: bool, branch: &str, branch_matches: bool)
     -> (conflict: bool)
     ensures conflict == (path_matches || (branch@ != "HEAD"@ && branch_matches)),
 {
-    path_matches || (!equal_text(branch, "HEAD") && branch_matches)
+    path_matches || (!<&str>::exec_eq(branch, "HEAD") && branch_matches)
 }
 
 }
