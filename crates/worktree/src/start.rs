@@ -110,7 +110,7 @@ pub(crate) struct Runner {
     pub(crate) config: Config,
     pub(crate) birth_lease: Option<crate::ownership::Lease>,
     pub(crate) coordinator_inputs: Option<chrono_harness::retained_artifacts::retention::ReadScope>,
-    environment: BTreeMap<String, String>,
+    pub(crate) environment: BTreeMap<String, String>,
     tool: observation::Tool,
     processes: Vec<Value>,
     immutable_blobs: BTreeMap<(PathBuf, String, String), Vec<u8>>,
