@@ -1,0 +1,27 @@
+_commit: v0.1.0-alpha.2
+_src_path: gh:chrono-harness/chrono-harness-template
+dev_branch: dev
+features:
+- cache
+- ci
+- distribution
+- harness
+- host-bootstrap
+- host-release
+- inputs
+- instructions
+- judge-ci
+- judge-cost
+- judge-filemap
+- judge-mixed
+- judge-projects
+- registration
+- judge-routes
+- judge-workflow
+- pr
+- worktree
+- verus
+generate_check: false
+repository: chrono-harness/chrono-harness-worktree
+required_check: check
+
