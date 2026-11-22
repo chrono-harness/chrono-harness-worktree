@@ -36,3 +36,4 @@ prove verify.worktree-lifecycle crates/worktree/src/verified_lifecycle.rs
 prove verify.worktree-attention crates/worktree/src/verified_attention.rs
 prove verify.owner-publication-tests crates/worktree-tests/tests/verified_owner_publication.rs
 prove verify.worktree-attention-tests crates/worktree-tests/tests/verified_attention.rs
+prove verify.worktree-lifecycle-tests crates/worktree-tests/tests/verified_lifecycle.rs
