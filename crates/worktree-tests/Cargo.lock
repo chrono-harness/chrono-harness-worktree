@@ -105,6 +105,8 @@ version = "0.1.0"
 dependencies = [
  "chrono-worktree",
  "serde_json",
+ "sha2",
+ "tempfile",
  "vstd",
 ]
 
