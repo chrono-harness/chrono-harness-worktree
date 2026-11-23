@@ -263,6 +263,20 @@ pub fn run(args: &[String]) -> CliOutput {
     if args == ["--help"] {
         return CliOutput { exit_code: 0, stdout: "chrono-worktree start --host-root ROOT --config PATH --kind feature|integration --name TASK --path DESTINATION\nchrono-worktree reconstruct --host-root ROOT --config PATH --kind feature|integration --name TASK --path DESTINATION --plan STATE_PATH\nchrono-worktree inspect-rebind|rebind|resume-rebind|recover|recover-interrupted|cleanup|cleanup-fetch|cleanup-fetch-interrupted|cleanup-remote|retire-evidence --host-root ROOT --config PATH --plan STATE_PATH\nchrono-worktree finish [--path WORKTREE] [--dispose-evidence] [--artifacts-only] [--retained-commit OID]\nchrono-worktree maintain\nchrono-worktree maintenance-service [--host-root COORDINATOR]\nchrono-worktree status [--path WORKTREE]\nchrono-worktree import --path WORKTREE\nchrono-worktree migrate --path WORKTREE [--adopt-cleanup-policy] [--adopt-cache STATE_PATH] [--adopt-fixtures STATE_PATH] [--partition-producer ID]\nchrono-worktree use [--path WORKTREE] --operation REGISTERED_OPERATION\nLifecycle commands default to --host-root . --config .chrono-harness/worktree.json; require explicit automatic-cleanup adoption. Unified maintenance uses adopted OS socket activation; idle/timer policy is in maintenance.json. No PR/merge verdict.\n".into(), stderr: String::new() };
     }
+    if args.first().map(String::as_str) == Some("adopted-owner-v1") {
+        return match automatic::adopted_owner(args) {
+            Ok(report) => CliOutput {
+                exit_code: 0,
+                stdout: format!("{report}\n"),
+                stderr: String::new(),
+            },
+            Err(error) => CliOutput {
+                exit_code: 2,
+                stdout: String::new(),
+                stderr: format!("E_OWNER_ADOPTION: {error}\n"),
+            },
+        };
+    }
     if args.first().map(String::as_str) == Some("check-inputs") {
         return match check_inputs::dispatch(args) {
             Ok(stdout) => CliOutput {

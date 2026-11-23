@@ -32,13 +32,24 @@ use crate::verified_owner_publication as publication_policy;
 const CURRENT_OWNER_SLOT: &str = ".chrono-harness/state/bootstrap-owner-current.json";
 
 #[cfg(not(verus_keep_ghost))]
-fn protect_adoption(root: &Path, adoption: &Value) -> Result<Option<Lease>, String> {
-    if adoption["schema"] != "chrono-worktree-owner-adoption/v1" {
+fn adoption_original(
+    root: &Path,
+    adoption: &Value,
+    consumer: Option<&str>,
+) -> Result<(Receipt, Value), String> {
+    if !publication_policy::owner_adoption_header(adoption["schema"].as_str().unwrap_or_default()) {
         return Err("current owner adoption schema".into());
     }
     let receipt: Receipt = serde_json::from_value(adoption["receipt"].clone())
         .map_err(|e| format!("current owner adoption receipt: {e}"))?;
-    let raw = crate::recovery::state_bytes(root, &receipt.path)?;
+    if consumer.is_some()
+        && !receipt
+            .path
+            .starts_with(".chrono-harness/state/automatic-cleanup-v2/")
+    {
+        return Err("current owner adoption receipt outside lifecycle state".into());
+    }
+    let raw = crate::recovery::state_bytes_for_consumer(root, &receipt.path, consumer)?;
     let mut original = adoption.clone();
     original
         .as_object_mut()
@@ -47,6 +58,12 @@ fn protect_adoption(root: &Path, adoption: &Value) -> Result<Option<Lease>, Stri
     if sha256(&raw) != receipt.sha256 || json(&raw)? != original {
         return Err("current owner adoption original changed".into());
     }
+    Ok((receipt, original))
+}
+
+#[cfg(not(verus_keep_ghost))]
+fn protect_adoption(root: &Path, adoption: &Value) -> Result<Option<Lease>, String> {
+    let (receipt, original) = adoption_original(root, adoption, None)?;
     chrono_harness::retained_artifacts::retention::reference_report(
         root,
         CURRENT_OWNER_SLOT,
@@ -616,6 +633,151 @@ fn publication_original(
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
+fn completed_publication(
+    record: &Value,
+    expected: &publication_policy::Stage,
+    target: &Path,
+    previous: &Path,
+    intent: &Path,
+    result_path: &Path,
+) -> Result<Value, String> {
+    let planned: publication_policy::Intent =
+        decode(&fs::read(intent).map_err(|e| e.to_string())?)?;
+    let installed = owner_binding(target)?;
+    if !matches!(
+        publication_policy::selected_action(&installed, &expected.previous, &planned.replacement),
+        publication_policy::SelectedAction::Keep
+    ) {
+        return Err("selected owner drifted after publication intent".into());
+    }
+    let result = json(&fs::read(result_path).map_err(|e| e.to_string())?)?;
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Completed {
+        schema: String,
+        stage: Value,
+        installed: Value,
+        adoption: String,
+        task_completion: String,
+    }
+    let completed: Completed = serde_json::from_value(result.clone()).map_err(|e| e.to_string())?;
+    if !publication_policy::owner_publication_header(
+        &completed.schema,
+        &completed.adoption,
+        &completed.task_completion,
+    ) || completed.stage != *record
+        || completed.installed != value!(installed)
+        || !publication_policy::valid_intent(&planned, expected)
+        || !publication_policy::valid_publication(
+            &installed,
+            &planned.replacement,
+            &owner_binding(previous)?,
+            expected,
+        )
+    {
+        return Err("completed owner publication changed; preserve originals".into());
+    }
+    Ok(result)
+}
+
+/// Return the validated publication for a bootstrap caller holding its own construction report.
+#[cfg(not(verus_keep_ghost))]
+pub(crate) fn adopted_owner(args: &[String]) -> Result<Value, String> {
+    let (root, selected, match_installed, commit) = match args {
+        [_, root, selected] => (root, selected, false, None),
+        [_, root, selected, flag] if flag == "--if-installed" => (root, selected, true, None),
+        [_, root, selected, flag, commit] if flag == "--if-installed" => {
+            (root, selected, true, Some(commit))
+        }
+        _ => {
+            return Err("expected adopted-owner-v1 ROOT SELECTED [--if-installed [COMMIT]]".into());
+        }
+    };
+    let root = Path::new(root);
+    if !root.is_absolute() || !root.is_dir() || !selected.starts_with(".chrono-harness/bin/") {
+        return Err("invalid owner host root or selected path".into());
+    }
+    let target = no_symlink_parents(root, selected)?;
+    let slot = no_symlink_parents(root, CURRENT_OWNER_SLOT)?;
+    let current = match fs::read(&slot) {
+        Ok(bytes) => json(&bytes)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Value::Null),
+        Err(error) => return Err(error.to_string()),
+    };
+    if commit.is_some_and(|id| {
+        current["schema"] != "chrono-worktree-owner-adoption/v1"
+            || current["source_commit"].as_str() != Some(id.as_str())
+    }) || (match_installed && current["installed"] != executable_binding(&target)?)
+    {
+        return Ok(Value::Null);
+    }
+    use chrono_harness::retained_artifacts::retention;
+    let role = retention::current_report_role(CURRENT_OWNER_SLOT);
+    let (_, original) = adoption_original(root, &current, Some(&role))?;
+    // Require the complete adoption that deploy-owner wrote, including the unclaimed terminal handoff.
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Adopted {
+        schema: String,
+        source_commit: String,
+        stage_result: String,
+        stage_sha256: String,
+        installed: publication_policy::Binding,
+        original_owner: publication_policy::Binding,
+        #[serde(rename = "original_protection")]
+        _original_protection: Value,
+        publication: Value,
+        #[serde(rename = "terminal_handoff")]
+        _terminal_handoff: String,
+        #[serde(rename = "task_completion")]
+        _task_completion: String,
+    }
+    let adopted: Adopted = serde_json::from_value(original).map_err(|e| e.to_string())?;
+    if !publication_policy::owner_adoption_header(&adopted.schema) {
+        return Err("current owner adoption schema".into());
+    }
+    let record = &adopted.publication["stage"];
+    let expected: publication_policy::Stage =
+        serde_json::from_value(record.clone()).map_err(|e| e.to_string())?;
+    let staged = &expected.staged.path;
+    if expected.selected != *selected
+        || !publication_policy::retained_paths(staged.as_bytes(), selected.as_bytes())
+    {
+        return Err("owner adoption retained paths differ".into());
+    }
+    let _stage_guard = retention::consumer_read_guard(root, staged, &role)?;
+    if !publication_policy::staged_binding_equal(
+        &owner_binding(&no_symlink_parents(root, staged)?)?,
+        &expected.staged,
+    ) {
+        return Err("adopted owner stage changed".into());
+    }
+    let directory = staged.rsplit_once('/').ok_or("owner stage directory")?.0;
+    let retained = |name: &str| no_symlink_parents(root, &format!("{directory}/{name}"));
+    let publication = completed_publication(
+        record,
+        &expected,
+        &target,
+        &retained("previous-owner")?,
+        &retained("publication-intent.json")?,
+        &retained("publication-result.json")?,
+    )?;
+    if publication != adopted.publication
+        || publication["installed"] != value!(adopted.installed)
+        || record["previous"] != value!(adopted.original_owner)
+        || executable_binding(&target)? != value!(adopted.installed)
+        || json(&fs::read(&slot).map_err(|e| e.to_string())?)? != current
+    {
+        return Err("current owner adoption changed".into());
+    }
+    Ok(
+        value!({"source_commit":adopted.source_commit,"stage_result":adopted.stage_result,
+        "stage_sha256":adopted.stage_sha256,"installed":adopted.installed,"stage":record,
+        "report_slot":CURRENT_OWNER_SLOT}),
+    )
+}
+
 // Only deploy_owner calls this, while its original admission and every affected
 // enrollment remain exclusive. Intent and the retained inode survive interruption
 // after rename; publication alone claims neither adoption nor task completion.
@@ -641,34 +803,7 @@ fn publish_owner(root: &Path, record: &Value) -> Result<Value, String> {
     if result_path.is_file() {
         // A completed directory is immutable. A retry can consume its exact
         // publication, but cannot reopen it or repair changed originals.
-        let planned: publication_policy::Intent =
-            decode(&fs::read(&intent).map_err(|e| e.to_string())?)?;
-        let installed = owner_binding(&target)?;
-        if !matches!(
-            publication_policy::selected_action(
-                &installed,
-                &expected.previous,
-                &planned.replacement
-            ),
-            publication_policy::SelectedAction::Keep
-        ) {
-            return Err("selected owner drifted after publication intent".into());
-        }
-        let result = json(&fs::read(&result_path).map_err(|e| e.to_string())?)?;
-        let original = value!({"schema":"chrono-bootstrap-owner-publication/v1","stage":record,
-            "installed":installed,"adoption":"not-claimed","task_completion":"not-claimed"});
-        if !publication_policy::valid_intent(&planned, &expected)
-            || !publication_policy::valid_publication(
-                &installed,
-                &planned.replacement,
-                &owner_binding(&previous)?,
-                &expected,
-            )
-            || result != original
-        {
-            return Err("completed owner publication changed; preserve originals".into());
-        }
-        return Ok(result);
+        return completed_publication(record, &expected, &target, &previous, &intent, &result_path);
     }
     let publication = chrono_harness::retained_artifacts::retention::Inventory::adopted(root)?
         .map(|inventory| inventory.resume_unfinished_directory("bootstrap-owner-stage", parent))

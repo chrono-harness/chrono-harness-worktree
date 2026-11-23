@@ -211,6 +211,8 @@ pub(crate) mod migration;
 pub(crate) mod migration;
 #[cfg(not(verus_keep_ghost))]
 mod owner_deployment;
+#[cfg(not(verus_keep_ghost))]
+pub(crate) use owner_deployment::adopted_owner;
 #[cfg(verus_keep_ghost)]
 #[path = "automatic/producer.rs"]
 #[rustfmt::skip]

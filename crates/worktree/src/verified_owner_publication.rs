@@ -208,6 +208,18 @@ pub struct Intent {
     pub replacement: Binding,
 }
 
+pub fn owner_publication_header(schema: &str, adoption: &str, completion: &str) -> (valid: bool)
+    ensures valid <==> (schema@ == "chrono-bootstrap-owner-publication/v1"@
+        && adoption@ == "not-claimed"@ && completion@ == "not-claimed"@),
+{
+    <&str>::exec_eq(schema, "chrono-bootstrap-owner-publication/v1") && <&str>::exec_eq(adoption, "not-claimed")
+        && <&str>::exec_eq(completion, "not-claimed")
+}
+
+pub fn owner_adoption_header(schema: &str) -> (valid: bool)
+    ensures valid <==> schema@ == "chrono-worktree-owner-adoption/v1"@,
+{ <&str>::exec_eq(schema, "chrono-worktree-owner-adoption/v1") }
+
 pub open spec fn same_binding(a: &Binding, b: &Binding) -> bool {
     a.identity@ == b.identity@ && a.sha256@ == b.sha256@ && a.size == b.size
 }
