@@ -29,3 +29,7 @@ workflow 判断原始 UTC 时间与宿主设定的 `max_age_hours`。上下文�
 ### 查询已采用的工作树程序
 
 `chrono-worktree adopted-owner-v1 ROOT SELECTED [--if-installed [COMMIT]]` 供 bootstrap 核对已部署的生命周期程序。ROOT 是宿主绝对路径，SELECTED 是宿主登记的程序相对路径。查询核对采用收据、发布意图、发布结果以及原程序、暂存程序和选中程序的文件身份。成功时输出 JSON，含构建报告的来源提交、位置、摘要、读取该报告的槽位、暂存记录及选中程序身份。没有采用记录时输出 `null`。加 `--if-installed` 后，当前程序与记录不符也返回 `null`。给定 COMMIT 时只匹配该来源提交。已匹配的记录损坏时退出 2，错误写到 stderr。
+
+## 清理宿主的滚动日志
+
+采用 `.chrono-harness/logging.json` 的宿主须在工作树外安装独立发行的 `chrono-diagnostics`。维护时按主检出的 `diagnostics_program` 或 PATH 选择该命令，同步调用 `expire-logs-v1 ROOT` 核对每次结果。日志策略归该命令解释，部分删除失败进入工作树维护报告；没有日志配置时无需安装该程序。

@@ -1,0 +1,44 @@
+use chrono_worktree::log_retention::expire;
+use std::{collections::BTreeMap, path::Path};
+
+#[test]
+fn log_owner_keeps_absence_partial_results_and_original_failures_distinct() {
+    let env = BTreeMap::from([("PATH".into(), "/bin".into())]);
+    for (code, bytes, err, expected) in [
+        (0, "null", "", Ok(None)),
+        (
+            0,
+            r#"{"removed":3,"legacy":0,"busy":false,"errors":[]}"#,
+            "",
+            Ok(Some(3)),
+        ),
+        (
+            1,
+            r#"{"removed":1,"legacy":0,"busy":false,"errors":["denied"]}"#,
+            "",
+            Ok(Some(1)),
+        ),
+        (1, "null", "", Err("contradicts")),
+        (2, "", "unreadable\n", Err("unreadable")),
+        (0, "null", "unexpected", Err("unexpected")),
+    ] {
+        let result = expire(
+            Path::new("/repo with spaces"),
+            "/tools/chrono-diagnostics",
+            7,
+            8192,
+            &env,
+            |spec| {
+                assert_eq!(spec.program, "/tools/chrono-diagnostics");
+                assert_eq!(spec.args, ["expire-logs-v1", "/repo with spaces"]);
+                assert_eq!(spec.env, env);
+                assert_eq!((spec.timeout_seconds, spec.output_limit_bytes), (7, 8192));
+                Ok((code, bytes.as_bytes().to_vec(), err.as_bytes().to_vec()))
+            },
+        );
+        match expected {
+            Ok(removed) => assert_eq!(result.unwrap().map(|r| r.removed), removed),
+            Err(message) => assert!(result.unwrap_err().contains(message)),
+        }
+    }
+}

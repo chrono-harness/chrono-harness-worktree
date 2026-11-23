@@ -27,3 +27,7 @@ path = "tests/observation_age.rs"
 [[test]]
 name = "adopted_owner"
 path = "tests/adopted_owner.rs"
+
+[[test]]
+name = "log_retention"
+path = "tests/log_retention.rs"

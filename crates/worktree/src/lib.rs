@@ -77,6 +77,8 @@ pub use check_inputs::observation_age::check as check_observation_age;
 #[cfg(not(verus_keep_ghost))]
 mod evidence_retirement;
 #[cfg(not(verus_keep_ghost))]
+pub mod log_retention;
+#[cfg(not(verus_keep_ghost))]
 mod maintenance;
 #[cfg(not(verus_keep_ghost))]
 mod ownership;
@@ -148,6 +150,8 @@ pub struct Config {
     pub check_inputs: Option<check_inputs::Policy>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub registration_program: Option<String>,
+    #[serde(default)]
+    pub diagnostics_program: Option<String>,
     pub host_config: String,
     pub remote: String,
     pub git: Git,
