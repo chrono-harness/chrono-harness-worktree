@@ -5,6 +5,16 @@ use chrono_harness::verus;
 use vstd::prelude::*;
 
 verus! {
+/// Compare the physical checkout age with the configured whole-second window.
+pub fn age_window_passed(elapsed_nanos: u128, reuse_seconds: u64, delete_seconds: u64,
+    deleting: bool) -> (passed: bool)
+    ensures passed <==> elapsed_nanos as int > 1_000_000_000 *
+        (if deleting { delete_seconds as int } else { reuse_seconds as int }),
+{
+    let window = if deleting { delete_seconds } else { reuse_seconds };
+    elapsed_nanos > u128::from(window) * 1_000_000_000
+}
+
 pub fn age_preservation_required(disposable_present: bool, retained_file_present: bool)
     -> (required: bool)
     ensures required == (disposable_present || !retained_file_present),
@@ -53,11 +63,12 @@ impl AgePolicy {
         relative_path(self.preserved_branch_prefix.trim_end_matches('/'))
     }
     fn eligible(&self, age: Duration, deleting: bool) -> bool {
-        age > Duration::from_secs(if deleting {
-            self.delete_after_seconds
-        } else {
-            self.reuse_after_seconds
-        })
+        age_window_passed(
+            age.as_nanos(),
+            self.reuse_after_seconds,
+            self.delete_after_seconds,
+            deleting,
+        )
     }
 }
 #[cfg(not(verus_keep_ghost))]

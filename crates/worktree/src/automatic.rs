@@ -4098,13 +4098,13 @@ impl Manager {
             } else {
                 false
             };
-            if !crate::verified_lifecycle::select_cleanup(
+            if !crate::verified_lifecycle::select_drain(
                 &e.status,
                 e.ownership.as_ref().is_some_and(|o| o.cache_pending),
                 maintenance,
                 e.terminal.as_ref().is_some_and(|t| t.artifacts_only),
-            ) && !age
-            {
+                age,
+            ) {
                 continue;
             }
             if self._gate.lease.is_some() && e.ownership.is_none() {

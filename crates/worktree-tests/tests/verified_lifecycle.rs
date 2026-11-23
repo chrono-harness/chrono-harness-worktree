@@ -568,6 +568,26 @@ fn cleanup_observations_keep_missing_unknown_and_complete_text_distinct() {
     expect_cleanup_outcome(status_suffix, true, false, Failed);
 }
 
+// A maintenance visit observes this still-active enrollment with no pending cache.
+fn expired_active_enrollment_is_selected(elapsed_nanos: u128, reuse: u64, delete: u64)
+    requires reuse < delete, elapsed_nanos as int > delete as int * 1_000_000_000,
+{
+    let reusable = policy::age_window_passed(elapsed_nanos, reuse, delete, false);
+    let expired = policy::age_window_passed(elapsed_nanos, reuse, delete, true);
+    let selected = policy::select_drain("active", false, true, false, reusable);
+    expect(reusable && expired && selected);
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn observation_at_the_threshold_waits_and_one_nanosecond_later_is_due() {
+    let on_reuse = policy::age_window_passed(23_000_000_000, 23, 24, false);
+    let past_reuse = policy::age_window_passed(23_000_000_001, 23, 24, false);
+    let on_delete = policy::age_window_passed(24_000_000_000, 23, 24, true);
+    expect(!on_reuse && past_reuse && !on_delete);
+    expired_active_enrollment_is_selected(24_000_000_001, 23, 24);
+    expired_active_enrollment_is_selected(u128::MAX, 0, u64::MAX);
+}
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn terminal_and_released_retained_work_remain_discoverable() {
     broadcast use vstd::string::group_string_axioms;
