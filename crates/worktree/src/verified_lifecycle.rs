@@ -49,9 +49,11 @@ pub use automatic_verification::{
 };
 
 #[cfg(not(verus_keep_ghost))]
-pub use crate::automatic::age::{age_preservation_required, reusable_release};
+pub use crate::automatic::age::{age_preservation_required, age_window_passed, reusable_release};
 #[cfg(verus_keep_ghost)]
-pub use automatic_verification::age::{age_preservation_required, reusable_release};
+pub use automatic_verification::age::{
+    age_preservation_required, age_window_passed, reusable_release,
+};
 
 #[cfg(not(verus_keep_ghost))]
 pub use crate::automatic::inventory::append_action_index;
@@ -242,6 +244,16 @@ pub fn select_cleanup(status: &str, cache_pending: bool, maintenance: bool, arti
     <&str>::exec_eq(status, "terminal")
         || (<&str>::exec_eq(status, "active") && cache_pending)
         || (<&str>::exec_eq(status, "retained") && maintenance && !artifacts_only)
+}
+
+/// Age admits a visited enrollment to the existing ownership and custody checks.
+pub fn select_drain(status: &str, cache_pending: bool, maintenance: bool,
+    artifacts_only: bool, age_due: bool) -> (selected: bool)
+    ensures selected <==> (age_due || status@ == "terminal"@
+        || (status@ == "active"@ && cache_pending)
+        || (status@ == "retained"@ && maintenance && !artifacts_only)),
+{
+    age_due || select_cleanup(status, cache_pending, maintenance, artifacts_only)
 }
 
 pub fn retain_evidence(disposal_authorized: bool, evidence_present: bool) -> (retain: bool)
