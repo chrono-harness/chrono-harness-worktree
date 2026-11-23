@@ -16,7 +16,7 @@
 
 **从单轮到时间上界。** 取删除窗口已严格过去、且全部删除条件开始持续满足的时刻 t。若宿主保证在随后的 P 时间内成功访问这条登记，并能在访问后的 C 时间内完成该次处置，则至迟在 t + P + C 删除。P 包含调度、枚举和同轮较早地址的耗时。维护遍历本轮取得的地址；若调度停止、登记始终不可读、磁盘操作一直失败或租约持续被占用，就无法从间隔配置推出 P 或 C。宿主需要实测定时触发、Git 保全及最终文件消失。
 
-示例仓在 macOS 用户会话采用 launchd，将复用窗口缩为 23 秒，删除和原件保留窗口设为 24 秒。六轮定时维护成功，工作树、缓存和到期报告均已回收。另一次把原件保留窗口缩为 3 秒的实验中，退役记录在消费过程中到期，三轮维护报告失败。Linux 的 systemd 用户定时器仍待原生验收。[示例验收](https://github.com/chrono-harness/chrono-harness-example/pull/29)
+示例仓在 macOS 用户会话采用 launchd，将复用窗口缩为 23 秒，删除和原件保留窗口设为 24 秒。六轮定时维护成功，工作树、缓存和到期报告均已回收。另一次把原件保留窗口缩为 3 秒的实验中，退役记录在消费过程中到期，三轮维护报告失败。在 Ubuntu 用户会话中，systemd 定时器实际触发了到期工作树、Python 缓存和 PR 提醒的回收，并保留了仍有效的提醒。[macOS 验收](https://github.com/chrono-harness/chrono-harness-example/pull/29) · [Ubuntu 定时运行](https://github.com/chrono-harness/chrono-harness-example/actions/runs/45231805116)
 
 ## 复用本地完整检查的上下文
 
