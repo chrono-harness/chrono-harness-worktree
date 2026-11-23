@@ -423,13 +423,45 @@ fn linked_retention_status(
 
 #[cfg(not(verus_keep_ghost))]
 fn maintain_logs(
+    r: &Runner,
+    coordinator: &Path,
     root: &Path,
     inventory: &mut inventory::Report,
     failures: &mut Vec<String>,
     results: &mut Vec<Value>,
 ) {
     let scope = format!("runtime logs: {}", root.display());
-    let result = match chrono_harness::maintain_runtime_logs(root) {
+    let expiry = (|| {
+        match fs::symlink_metadata(root.join(".chrono-harness/logging.json")) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error.to_string()),
+            Ok(_) => (),
+        }
+        let selected = r
+            .config
+            .diagnostics_program
+            .as_deref()
+            .unwrap_or("chrono-diagnostics");
+        let executable = chrono_harness::resolve_program(
+            coordinator,
+            selected,
+            r.environment.get("PATH").map(String::as_str),
+        )?;
+        crate::log_retention::expire(
+            root,
+            executable
+                .to_str()
+                .ok_or("diagnostics program path is not UTF-8")?,
+            r.config.timeout_seconds,
+            r.config.output_limit_bytes,
+            &r.environment,
+            |command| {
+                let p = chrono_harness::run_process(coordinator, command, &[])?;
+                Ok((p.exit_code, p.stdout_bytes, p.stderr_bytes))
+            },
+        )
+    })();
+    let result = match expiry {
         Ok(None) => return,
         Ok(Some(result)) => {
             for error in &result.errors {
@@ -702,7 +734,14 @@ fn run_round(
     report["output_retention"] = retention;
     let mut linked_retention = Vec::new();
     let mut runtime_logs = Vec::new();
-    maintain_logs(root, &mut inventory, &mut failures, &mut runtime_logs);
+    maintain_logs(
+        r,
+        root,
+        root,
+        &mut inventory,
+        &mut failures,
+        &mut runtime_logs,
+    );
     for path in linked_retention_roots {
         if unprotected.contains(&path) {
             inventory.retention(
@@ -723,7 +762,14 @@ fn run_round(
                 inventory.retention(&path, value!({"kind":"source-result","status":status}));
                 return Ok(status);
             }
-            maintain_logs(&path, &mut inventory, &mut failures, &mut runtime_logs);
+            maintain_logs(
+                r,
+                root,
+                &path,
+                &mut inventory,
+                &mut failures,
+                &mut runtime_logs,
+            );
             let result = maintain_retention_inventory(&path, &mut inventory)?;
             Ok::<_, String>(if result.is_some() {
                 "reported"
