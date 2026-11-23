@@ -1,4 +1,4 @@
-_commit: v0.1.0-alpha.13
+_commit: v0.1.0-alpha.37
 _src_path: gh:chrono-harness/chrono-harness-template
 dev_branch: dev
 features:
@@ -19,6 +19,7 @@ features:
 - judge-routes
 - judge-workflow
 - pr
+- test-git
 - worktree
 - verus
 generate_check: false
