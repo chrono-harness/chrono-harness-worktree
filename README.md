@@ -39,3 +39,21 @@ workflow 判断原始 UTC 时间与宿主设定的 `max_age_hours`。上下文�
 宿主采用 `.chrono-harness/retention.json` 时，worktree 在删除业务目录前向已安装的 `chrono-harness retained-artifacts-v1` 查询这些路径。保管进程检查仍被消费者占用的原件，并把目录删除租约的文件描述符交给 worktree。回收前会再次核对租约。请在工作树外安装本仓 mise 配置选定的 runner 发行。worktree 从 PATH 查找 runner。使用系统 PATH 的定时服务可从宿主的工作树程序链接旁加载同一套安装中的 runner。
 
 单独选装 worktree 时，v3 主机在已登记的报告业务目录中保存工作树报告和进程原件。运行 `maintain` 时，`terminal_history.keep_seconds` 同时决定单工具报告的保留时间。省略该字段时报告默认保留 24 小时。需要长期使用的报告须在窗口内复制到持久存储。活跃进程持有内核租约，仍由现行登记或保留窗口内报告引用的原件继续保留。到期且最后一个引用结束后，由下一次取得目录租约的成功维护轮次删除。宿主配置定时维护后，这一过程自动运行。已配置通用原件保管的宿主使用其登记的保留策略。
+
+## 多个命令复用工作树
+
+宿主可在协调者的 cleanup.json 中，为已登记的 operation 声明此次命令读写的资源。use、check 和 bootstrap 从同一份协调者配置取范围。下面的两个命令可以并行读取源码，写入文档的操作和读取同一文档的操作会互斥。
+
+```json
+{
+  "operation_scopes": {
+    "example.check": {"reads": ["path:src"], "writes": ["path:build"]},
+    "docs.preview": {"reads": ["path:src", "path:docs"], "writes": ["path:preview"]},
+    "docs.edit": {"reads": [], "writes": ["path:docs"]}
+  }
+}
+```
+
+`path:` 后是相对当前工作树的文件或目录。目录范围包括后代。用 `checkout` 声明整棵树。Git 的 index、HEAD、当前分支与指定的公共引用分别用 `git:index`、`git:head`、`git:branch` 和 `git:refs/heads/名字` 声明。同一仓库中的两个检出有各自的 index，可以竞争同一个实际分支引用。维护方应为实际会写 index 和 ref 的复合操作同时登记这两个资源。只有通过本入口进入并获得保护的命令参加调度；其他 Git 客户端仍使用 Git 自己的锁。
+
+启用此配置后，缺少范围的命令保守地占用当前工作树、其 Git 元数据和公共引用。具体命令只在与当前消费者的读写范围冲突时被拒绝，最后一个仍持有能力的子孙进程结束后可以重新进入。临时声明位于协调者的 operation-scopes 业务目录。正常返回、后续操作和定时维护都可回收到期声明。机器或服务中断期间没有墙钟清理上界。
