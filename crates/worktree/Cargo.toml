@@ -12,6 +12,8 @@ doctest = false
 [features]
 # Deterministic scheduling seam used only by the dedicated receipt behavior tests.
 producer-birth-test = []
+# Expose the injected Git observation boundary to the dedicated test package.
+remote-observation-test = []
 
 [[bin]]
 name = "chrono-worktree"
