@@ -951,13 +951,28 @@ pub(crate) fn with_report_for_consumer<T>(
     crate::recovery::protect_report_consumer(&mut report, report_publication.as_ref(), consumer)?;
     let mut data = serde_json::to_vec(&report).map_err(|e| e.to_string())?;
     data.push(b'\n');
-    if let Some(publication) = &report_publication {
-        publication.check_length(data.len() as u64)?;
-    }
-    output.write_all(&data).map_err(|e| e.to_string())?;
-    output.sync_all().map_err(|e| e.to_string())?;
-    if let Some(publication) = report_publication {
-        publication.complete(crate::recovery::publication_outcome(&report, &data))?;
+    let published = (|| -> Result<(), String> {
+        if let Some(publication) = &report_publication {
+            publication.check_length(data.len() as u64)?;
+        }
+        output.write_all(&data).map_err(|e| e.to_string())?;
+        output.sync_all().map_err(|e| e.to_string())?;
+        if let Some(publication) = report_publication {
+            publication.complete(crate::recovery::publication_outcome(&report, &data))?;
+        }
+        Ok(())
+    })();
+    if let Err(error) = published {
+        if operation == "maintain" && report["complete_inventory"].is_object() {
+            // stdout can still describe the producer's actual incomplete work when
+            // the host cannot store its full report. Do not claim a sealed report.
+            return Ok(value!({
+                "schema":report["schema"],"operation":operation,"status":"failed",
+                "report_path":report_path,"report_publication":"failed","error":error,
+                "operation_error":report["error"],"complete_inventory":report["complete_inventory"]
+            }));
+        }
+        return Err(error);
     }
     crate::recovery::settle_report(&publication_root, &report)?;
     if matches!(operation, "start" | "reconstruct" | "producer-finish") {

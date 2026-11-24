@@ -453,6 +453,14 @@ impl Report {
             parent["complete_inventory"]["status"] = value!("incomplete");
             parent["complete_inventory"]["member_enumeration_complete"] = value!(false);
             parent["complete_inventory"]["measurements_complete"] = value!(false);
+            // Buffered writes can have succeeded before the underlying file received any bytes.
+            // Only an empty physical file establishes an exact remaining JSONL row count here.
+            let length = fs::symlink_metadata(self.root.join(&self.path))
+                .ok()
+                .filter(|m| m.is_file())
+                .map(|m| m.len());
+            parent["complete_inventory"]["byte_length"] = value!(length);
+            parent["complete_inventory"]["rows"] = value!(length.filter(|&n| n == 0));
             return Err(error);
         }
         let physical = self.root.join(&self.path);
