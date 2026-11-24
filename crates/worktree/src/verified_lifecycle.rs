@@ -143,7 +143,7 @@ pub fn accept_log_report<T>(exit: i32, report: Option<T>, has_errors: bool)
     ensures
         result.is_ok() <==> ((!has_errors && exit == 0)
             || (has_errors && report.is_some() && exit == 1)),
-        result.is_ok() ==> result == Ok(report),
+        result.is_ok() ==> result == Ok::<Option<T>, ()>(report),
 {
     if (!has_errors && exit == 0) || (has_errors && report.is_some() && exit == 1) {
         Ok(report)

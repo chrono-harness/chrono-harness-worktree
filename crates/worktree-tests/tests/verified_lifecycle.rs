@@ -85,11 +85,11 @@ fn log_contract<T>(exit: i32, stderr_empty: bool, report: Option<T>, has_errors:
         proof { match original_report {
             None => {
                 assert(result.is_ok() == (exit == 0 && !has_errors));
-                if result.is_ok() { assert(result == Ok(None)); }
+                if result.is_ok() { assert(result == Ok::<Option<T>, ()>(None)); }
             },
             Some(original) => {
                 assert(result.is_ok() == (if has_errors { exit == 1 } else { exit == 0 }));
-                if result.is_ok() { assert(result == Ok(Some(original))); }
+                if result.is_ok() { assert(result == Ok::<Option<T>, ()>(Some(original))); }
             },
         } }
     }
