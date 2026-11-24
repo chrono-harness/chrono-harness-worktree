@@ -140,6 +140,22 @@ mise run harness-setup
 
 等待超时、暂缺通知、通道丢失或无法取得结果时，保留原句柄、已有结果和保护，状态保持未知，不重复启动。继续独立且已授权的工作，说明缺少的能力，不另造轮询器或伪造完成。
 
+## collaboration.github-agent-identity
+
+在 GitHub 的 Issue、PR、评论和评审中记录实际动作或结果。先写给人看的正文，空一行，再在末尾追加以下三行。GitHub 页面显示中间的摘要，API 原文保留两个 HTML 注释及其中的关联 ID。事件也可单独成文。每行从第 1 列开始，字段顺序与空格固定，首尾使用同一个随机 event。
+
+~~~text
+<!-- chrono-agent:v3 event=<event> session=<session> parent=<parent> task=<task> -->
+**Agent** `<agent>` · **action** `<action>` · **state** `<state>` · **target** `<target>`
+<!-- /chrono-agent:v3 event=<event> -->
+~~~
+
+agent 写实际运行时和任务路径，至少两段，每段符合 [a-z0-9][a-z0-9_-]*。session 是会话首次建立时随机生成的公开小写 UUIDv4，同会话的重试复用；fork 新建 session 并接收直接父会话的公开 UUID，根写 parent=-。task 是同一实际任务沿用的公开随机 UUIDv4，父子共同工作时传递它。另行委派的独立任务新建 task，其委派事件可用 target=task/<新任务 UUID>。event 每个新动作或状态变化生成独立的公开随机 UUIDv4；传输重送复用原事件和相同字段。UUID 必须为小写标准形式、版本 4、变体 8/9/a/b。session、parent、task 和 event 的 UUID 两两不同。只使用这些公开专用 ID。
+
+action 取 task、delegate、issue、pr、review、push、ci.wait、check、build、test、release 之一。state 取 started、waiting、progress、blocked、succeeded、failed、cancelled 之一。target 取 self（本条正文所在的 GitHub 对象，适合编号未分配时）、task/<UUIDv4>、owner/repo#正整数、owner/repo@完整小写 Git OID（40 或 64 位）、owner/repo/run/正整数（可接 /attempt/正整数）或 owner/repo/tag/ASCII标签。开始、等待、解除阻塞、进展和结束时记录真实发生的转换，沿用同一 task、以不同 event 区分。等待完成通知时只发一次 waiting。成功/失败/取消结束该动作；新试验用新的事件陈述重试。保留乱序到达的每条观察，按 GitHub 原对象及创建时间组织，不以最后到达推断状态。相同 event 及内容只计一次，相同 event 内容冲突记为未知。
+
+用 chrono-instructions event-format 将八字段 JSON 写成 v3。event-read 从原始 GitHub 正文读取八字段 JSON，也能读取已发布的 v2。event-regex 输出 Python、PCRE2 和 JavaScript 可直接使用的三行正则，捕获组 1 到 8 依次为 event、session、parent、task、agent、action、state、target，末行反向引用第 1 组。读取器核对顶层 Markdown、唯一的末尾记录、UUID 独立性及首尾一致，接受 LF 或 CRLF 和一个可选末尾换行。引用、围栏及 HTML 示例中的内容按 Markdown 处理。缺失、无效、截断和歧义均记为未知。GitHub 提供作者账号，事件记录自报信息。复制整个记录能通过语法校验，身份和执行结果须分别核实。
+
 ## candidate.landing
 
 小步完成交付，并确认实际落地。限制同时进行的工作，及时解决阻碍、合并符合验收的变更，不积压未交付 PR。按实际合并、发布和已验收范围报告进度。合并或发布后，要核对实际状态、落地 SHA、产物和必要的后续检查；提交、创建 PR、检查通过或状态为 CLOSED，都不能单独证明已交付。受验候选与落地树不同时，说明差异并核对受影响范围。生命周期由调用方负责时，要明确交接边界，不能把阶段完成说成已经交付。
