@@ -22,8 +22,10 @@ use crate::document as wire;
 #[cfg(not(verus_keep_ghost))]
 use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
+use crate::facts;
+#[cfg(not(verus_keep_ghost))]
 use chrono_harness::{
-    decode, facts, file_identity, no_symlink_parents,
+    decode, file_identity, no_symlink_parents,
     prepared::{self, Context, InputRequest, PreparedCheck, Selection},
     units,
 };

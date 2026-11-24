@@ -31,3 +31,7 @@ path = "tests/adopted_owner.rs"
 [[test]]
 name = "log_retention"
 path = "tests/log_retention.rs"
+
+[[test]]
+name = "git_checkout"
+path = "tests/git_checkout.rs"

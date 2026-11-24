@@ -1,7 +1,7 @@
 //! A pre-fetch identity does not assert that fetching completed or identify its result.
 use crate::document::decode;
+use crate::facts;
 use crate::recovery::{self, Evidence, ExpectedResult};
-use chrono_harness::facts;
 use serde::Deserialize;
 use serde_json::Value;
 use std::path::Path;

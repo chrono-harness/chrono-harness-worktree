@@ -79,6 +79,10 @@ mod document;
 #[cfg(not(verus_keep_ghost))]
 mod evidence_retirement;
 #[cfg(not(verus_keep_ghost))]
+pub mod facts;
+#[cfg(not(verus_keep_ghost))]
+mod host_config;
+#[cfg(not(verus_keep_ghost))]
 pub mod log_retention;
 #[cfg(not(verus_keep_ghost))]
 mod maintenance;

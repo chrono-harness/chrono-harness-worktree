@@ -24,14 +24,14 @@ use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
 use crate::document::{decode, json, relative_path};
 #[cfg(not(verus_keep_ghost))]
+use crate::facts;
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::{
     recovery::{self, ExpectedResult, state_bytes},
     start::{self, Runner},
 };
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::facts;
 #[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
 #[cfg(not(verus_keep_ghost))]

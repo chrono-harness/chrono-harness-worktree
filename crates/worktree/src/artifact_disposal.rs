@@ -43,7 +43,7 @@ pub(crate) fn paths(
         .map(|name| {
             if tree
                 .keys()
-                .map(chrono_harness::facts::TreePath::as_str)
+                .map(String::as_str)
                 .chain(index.iter().map(String::as_str))
                 .any(|p| p.starts_with(name) || p == name.trim_end_matches('/'))
             {

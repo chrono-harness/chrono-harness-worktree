@@ -360,9 +360,9 @@ impl Manager {
         // Ordinary migration has already admitted the target's executable policy.
         // Explicit adoption executes the caller's policy. Its target supplies
         // only the fixed artifact declarations and registered policy paths.
-        let target_config = chrono_harness::facts::selected_config_with(&host_config, |path| {
-            r.blob(&target, &head, path)
-        })?;
+        let target_config =
+            crate::host_config::read(&host_config, |path| r.blob(&target, &head, path))?
+                .into_selected()?;
         let client = r.registration()?;
         let filemap_path = client.custody(&target_config)?;
         let target_filemap: Value = decode(&r.blob(&target, &head, &filemap_path)?)?;

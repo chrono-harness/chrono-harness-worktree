@@ -1,5 +1,6 @@
 //! Recreate metadata from explicit current identities; never infer a lost index.
 use crate::document::{no_symlink_parents, relative_path};
+use crate::facts;
 use crate::registration::Registrations;
 use crate::{
     maintenance,
@@ -7,7 +8,6 @@ use crate::{
     recovery,
     start::Runner,
 };
-use chrono_harness::facts;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json as value};
 use std::{

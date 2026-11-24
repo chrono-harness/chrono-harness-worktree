@@ -61,7 +61,7 @@ use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
 use crate::document::{decode, json, no_symlink_parents, relative_path};
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::facts;
+use crate::facts;
 #[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
 #[cfg(not(verus_keep_ghost))]

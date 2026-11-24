@@ -188,6 +188,7 @@ impl Registrations {
         client: Arc<Client>,
         mut documents: BTreeMap<String, Value>,
         entry: &str,
+        selected: &str,
     ) -> Result<Self, String> {
         #[derive(Deserialize)]
         struct Snapshot {
@@ -198,10 +199,8 @@ impl Registrations {
             Client::Registered(registered) => registered
                 .query(&json!({"operation":"snapshot","entry":entry,"documents":documents}))?,
             Client::Standalone => {
-                let selected =
-                    chrono_harness::facts::registry_identity(&documents, entry)?.effective_path;
                 let config = documents
-                    .get(&selected)
+                    .get(selected)
                     .ok_or("missing worktree host configuration")?;
                 let files = config["registries"]["filemap"]
                     .as_str()
@@ -214,11 +213,14 @@ impl Registrations {
                 // This tool consumes file ownership; execution edges belong to the optional judge.
                 // Preserve the exact immutable filemap as the worktree's binding.
                 Snapshot {
-                    effective_config: selected,
+                    effective_config: selected.into(),
                     filemap: filemap.clone(),
                 }
             }
         };
+        if selected != view.effective_config {
+            return Err("registration and worktree selected different fixed policies".into());
+        }
         let config = documents
             .remove(&view.effective_config)
             .ok_or("missing validated lifecycle configuration")?;

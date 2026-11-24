@@ -85,11 +85,13 @@ use crate::document::no_symlink_parents;
 #[cfg(not(verus_keep_ghost))]
 use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
+use crate::facts;
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::{Config, Start};
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{CommandSpec, ProcessResult, facts, observation, run_process_observed};
+use chrono_harness::{CommandSpec, ProcessResult, observation, run_process_observed};
 #[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json as value};
 #[cfg(not(verus_keep_ghost))]
@@ -343,14 +345,12 @@ impl Runner {
             self.config.output_limit_bytes,
             |args, input| {
                 let process = self.input(root, args, input)?;
-                let index = self.processes.len() - 1;
-                Ok((index, Self::output(process, args)?))
+                Self::output(process, args)
             },
-            str::to_owned,
         )?;
-        for blob in acquired {
+        for (path, bytes) in acquired {
             self.immutable_blobs
-                .insert((root.to_path_buf(), oid.into(), blob.path), blob.bytes);
+                .insert((root.to_path_buf(), oid.into(), path), bytes);
         }
         Ok(paths
             .iter()
@@ -982,10 +982,23 @@ pub(crate) fn registrations(
     head: &str,
     config_path: &str,
 ) -> Result<(Registrations, String), String> {
-    let snapshot = facts::registry_snapshot_with_batches(config_path, |paths| {
-        r.registry_blobs(root, head, paths)
-    })?;
-    let digest = crate::document::digest(&value!(snapshot.values))?;
-    let registrations = Registrations::load(r.registration()?, snapshot.values, config_path)?;
+    let resolved = crate::host_config::read(config_path, |path| r.blob(root, head, path))?;
+    let mut values = resolved.values;
+    let mut pending = Vec::new();
+    for role in ["judges", "projects", "filemap", "workflow"] {
+        let path = values[&resolved.selected]["registries"][role]
+            .as_str()
+            .ok_or_else(|| format!("missing {role} registry"))?;
+        crate::document::relative_path(path)?;
+        if !values.contains_key(path) && !pending.iter().any(|p| p == path) {
+            pending.push(path.to_owned());
+        }
+    }
+    for (path, raw) in r.registry_blobs(root, head, &pending)? {
+        values.insert(path, crate::document::json(&raw)?);
+    }
+    let digest = crate::document::digest(&values)?;
+    let registrations =
+        Registrations::load(r.registration()?, values, config_path, &resolved.selected)?;
     Ok((registrations, digest))
 }
