@@ -61,7 +61,7 @@ pub(crate) fn inspect(
         || !matches!(intent.operation.as_str(), "start" | "reconstruct")
         || intent.source_root != root.to_str().ok_or("source root is not UTF-8")?
         || intent.config_path != config_path
-        || intent.config_sha256 != chrono_harness::sha256(config_bytes)
+        || intent.config_sha256 != crate::document::sha256(config_bytes)
         || intent.source_registry_digest.is_empty()
         || intent.remote != config.remote
         || !intent.target_ref.starts_with("refs/heads/")

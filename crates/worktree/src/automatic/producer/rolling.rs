@@ -1,7 +1,7 @@
 //! 已声明的临时目录按整个分配回收；目录内的测试输入与捕获共用寿命。
 #![allow(unexpected_cfgs)]
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 

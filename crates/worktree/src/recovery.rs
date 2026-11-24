@@ -1,8 +1,8 @@
 //! Immutable pre-effect identity; an intent never certifies completion or a stopped process.
 #![allow(unexpected_cfgs)]
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -57,7 +57,9 @@ pub fn imported_policy_receipt_valid(receipt: &ImportedPolicyReceipt, published:
 }
 
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{decode, facts, json, no_symlink_parents, relative_path, sha256};
+use crate::document::sha256;
+#[cfg(not(verus_keep_ghost))]
+use chrono_harness::{decode, facts, json, no_symlink_parents, relative_path};
 #[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
 #[cfg(not(verus_keep_ghost))]

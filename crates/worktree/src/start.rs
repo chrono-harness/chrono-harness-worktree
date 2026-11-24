@@ -1,6 +1,6 @@
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -81,13 +81,14 @@ pub fn select_report_input_scope<S, T, R, E, O, P, C>(
 }
 
 #[cfg(not(verus_keep_ghost))]
+use crate::document::sha256;
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::{Config, Start};
 #[cfg(not(verus_keep_ghost))]
 use chrono_harness::{
     CommandSpec, ProcessResult, facts, no_symlink_parents, observation, run_process_observed,
-    sha256,
 };
 #[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json as value};
@@ -1004,7 +1005,7 @@ pub(crate) fn registrations(
     let snapshot = facts::registry_snapshot_with_batches(config_path, |paths| {
         r.registry_blobs(root, head, paths)
     })?;
-    let digest = chrono_harness::wire::digest(&value!(snapshot.values))?;
+    let digest = crate::document::digest(&value!(snapshot.values))?;
     let registrations = Registrations::load(r.registration()?, snapshot.values, config_path)?;
     Ok((registrations, digest))
 }

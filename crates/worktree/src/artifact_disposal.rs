@@ -106,10 +106,7 @@ pub(crate) fn dispose(
         if observed == "already-absent" {
             continue;
         }
-        let _retention = chrono_harness::retained_artifacts::retention::external_removal_guard(
-            target,
-            name.trim_end_matches('/'),
-        )?;
+        let _retention = crate::removal::Guard::one(target, name.trim_end_matches('/'))?;
         if let Some(retention) = &_retention {
             retention.stable()?;
         }

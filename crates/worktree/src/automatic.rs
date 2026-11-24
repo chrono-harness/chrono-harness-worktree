@@ -1,9 +1,9 @@
 //! Opt-in lifecycle cleanup with explicit terminal and kernel-quiescent cache phases.
 #![allow(unexpected_cfgs)]
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
-#[cfg(not(verus_keep_ghost))]
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
@@ -429,6 +429,8 @@ impl EvidenceExclusion {
     }
 }
 #[cfg(not(verus_keep_ghost))]
+use crate::document::sha256;
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::verified_owner_publication::{PolicyNamespace, policy_namespace_matches};
@@ -440,7 +442,7 @@ use crate::{
     start::{self, Runner},
 };
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{CommandSpec, decode, facts, json, no_symlink_parents, relative_path, sha256};
+use chrono_harness::{CommandSpec, decode, facts, json, no_symlink_parents, relative_path};
 #[cfg(not(verus_keep_ghost))]
 pub use producer::{RetainedArtifact, TemporaryHost};
 #[cfg(not(verus_keep_ghost))]
@@ -617,7 +619,7 @@ impl Entry {
         };
         let mut facts = self.terminal_facts(terminal);
         if !self.enrollment["age_retirement"].is_null()
-            || chrono_harness::wire::digest(&facts)? != *established
+            || crate::document::digest(&facts)? != *established
         {
             return Err("terminal handoff binding changed; preserve originals".into());
         }
@@ -966,7 +968,7 @@ impl ManagedProcessOriginals {
         let digest = chrono_harness::file_identity(Path::new(&command.program))?.0;
         let intent = value!({"schema":"chrono-worktree-managed-process-intent/v1",
             "cwd":target,"program":command.program,"argv":command.args,
-            "environment_sha256":chrono_harness::wire::digest(&command.env)?,
+            "environment_sha256":crate::document::digest(&command.env)?,
             "executable_sha256":digest,"stdin_sha256":sha256(&[]),
             "timeout_seconds":command.timeout_seconds,"output_limit_bytes":command.output_limit_bytes,
             "report_path":report["report_path"],"launch":"launch.json",
@@ -1224,7 +1226,7 @@ impl PolicyInputs {
             start::registrations(r, anchor, &anchor_head, &anchor_host_config)?;
         let anchor_registrations = Arc::new(anchor_registrations);
         let anchor_filemap_digest =
-            chrono_harness::wire::digest(&value!(anchor_registrations.filemap()))?;
+            crate::document::digest(&value!(anchor_registrations.filemap()))?;
         let source_head = if root == anchor {
             anchor_head.clone()
         } else {
@@ -2649,7 +2651,7 @@ impl Manager {
                     return Err("terminal original publication is not established".into());
                 }
             }
-            let binding = chrono_harness::wire::digest(&e.terminal_facts(terminal))?;
+            let binding = crate::document::digest(&e.terminal_facts(terminal))?;
             self.ledger.entries[i]
                 .terminal
                 .as_mut()
@@ -4049,7 +4051,7 @@ impl Manager {
             receipt: receipt.clone(),
             established: None,
         };
-        terminal.established = Some(chrono_harness::wire::digest(&e.terminal_facts(&terminal))?);
+        terminal.established = Some(crate::document::digest(&e.terminal_facts(&terminal))?);
         self.ledger.entries[i].terminal = Some(terminal);
         self.ledger.entries[i].status = "terminal".into();
         self.progress(
@@ -4237,7 +4239,7 @@ impl Manager {
                     attempt["source_commit"] = value!(self.inputs.anchor_head);
                     attempt["policy_source_root"] = value!(self.inputs.source_root);
                     attempt["policy_source_commit"] = value!(self.inputs.source_head);
-                    attempt["registry_digest"] = value!(chrono_harness::wire::digest(&value!(
+                    attempt["registry_digest"] = value!(crate::document::digest(&value!(
                         self.inputs.registrations.filemap()
                     ))?);
                     attempt["automatic_cleanup"] = value!(true);

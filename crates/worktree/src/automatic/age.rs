@@ -1,6 +1,6 @@
 //! Creation-age eligibility belongs to the existing addressed lifecycle owner.
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 

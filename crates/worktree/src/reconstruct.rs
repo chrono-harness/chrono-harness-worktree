@@ -1,8 +1,9 @@
+use crate::document::sha256;
 use crate::{
     Start,
     start::{self, Runner, paths},
 };
-use chrono_harness::{decode, facts, no_symlink_parents, relative_path, sha256};
+use chrono_harness::{decode, facts, no_symlink_parents, relative_path};
 use serde::Deserialize;
 use serde_json::{Value, json as value};
 use std::{collections::BTreeSet, fs, path::Path};
