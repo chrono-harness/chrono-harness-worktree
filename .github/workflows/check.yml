@@ -15,5 +15,5 @@ jobs:
         with:
           version: 2026.11.12
           cache: false
-          install_args: http:verus
+          install_args: http:verus http:chrono-harness http:chrono-host-bootstrap
       - run: VERUS="$(mise which verus)" ./check.sh
