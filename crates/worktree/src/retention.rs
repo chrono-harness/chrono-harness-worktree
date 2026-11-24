@@ -213,11 +213,9 @@ pub(crate) fn reference_report(
     let Some(owner) = Inventory::adopted(root)? else {
         return Ok(None);
     };
-    owner.publication::<()>(json!({"kind":"reference","slot":slot,"path":path,"inputs":inputs}))?;
-    Ok(Some(Guard::new(
-        owner,
-        json!({"kind":"close-slot","slot":slot}),
-    )))
+    let token: Option<u64> = owner
+        .publication(json!({"kind":"reference-held","slot":slot,"path":path,"inputs":inputs}))?;
+    Ok(token.map(|token| Guard::new(owner, json!({"kind":"release-read","token":token}))))
 }
 pub(crate) fn settle_report(root: &Path, slot: &str, path: &str) -> Result<(), String> {
     if let Some(owner) = Inventory::adopted(root)? {
