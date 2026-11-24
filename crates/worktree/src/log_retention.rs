@@ -32,18 +32,16 @@ pub fn expire(
         output_limit_bytes,
     };
     let (exit, stdout, stderr) = run(&command)?;
-    if !matches!(exit, 0 | 1) || !stderr.is_empty() {
+    if !crate::verified_lifecycle::log_owner_can_report(exit, stderr.is_empty()) {
         return Err(format!(
             "log owner exited {exit}: {}",
             String::from_utf8_lossy(&stderr).trim_end()
         ));
     }
     let result: Option<LogRetention> = crate::document::decode(&stdout)?;
-    let partial = result.as_ref().is_some_and(|r| !r.errors.is_empty());
-    if (exit == 1) != partial {
-        return Err(format!(
-            "log owner exit {exit} contradicts its expiry report"
-        ));
-    }
-    Ok(result)
+    let has_errors = result
+        .as_ref()
+        .is_some_and(|report| !report.errors.is_empty());
+    crate::verified_lifecycle::accept_log_report(exit, result, has_errors)
+        .map_err(|()| format!("log owner exit {exit} contradicts its expiry report"))
 }

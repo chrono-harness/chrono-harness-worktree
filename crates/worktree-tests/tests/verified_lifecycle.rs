@@ -73,6 +73,28 @@ mod inventory_failure_owner;
 
 verus! {
 
+#[cfg(verus_keep_ghost)]
+fn log_contract<T>(exit: i32, stderr_empty: bool, report: Option<T>, has_errors: bool) {
+    let ghost original_report = report;
+    let allowed = policy::log_owner_can_report(exit, stderr_empty);
+    let result = policy::accept_log_report(exit, report, has_errors);
+    if !stderr_empty || (exit != 0 && exit != 1) {
+        assert(!allowed);
+    } else {
+        assert(allowed);
+        proof { match original_report {
+            None => {
+                assert(result.is_ok() == (exit == 0 && !has_errors));
+                if result.is_ok() { assert(result == Ok::<Option<T>, ()>(None)); }
+            },
+            Some(original) => {
+                assert(result.is_ok() == (if has_errors { exit == 1 } else { exit == 0 }));
+                if result.is_ok() { assert(result == Ok::<Option<T>, ()>(Some(original))); }
+            },
+        } }
+    }
+}
+
 use policy::ProducerDeclarations;
 
 pub struct DeclarationRows<'a> { pub rows: Vec<(&'a str, bool)> }
