@@ -760,3 +760,40 @@ fn cleanup_of_an_import_uses_its_enrollment_and_explicit_cleanup_keeps_the_prefi
 
 
 }
+
+#[cfg(verus_keep_ghost)]
+verus! {
+fn observed_reference_contract<'a>(head: &'a str, retained: &'a str, branch: &str, target: &str, other: &str)
+    requires branch@ != target@, other@ != branch@, other@ != target@,
+{
+    use policy::{Advertised, already_absent, record_ref, retained_branch, single_endpoint};
+    let actual = single_endpoint(Some(target), None, target);
+    assert(actual);
+    let actual = single_endpoint(Some(target), Some(target), target);
+    assert(!actual);
+    let actual = single_endpoint(Some(other), None, target);
+    assert(!actual);
+    let actual = single_endpoint(None, None, target);
+    assert(!actual);
+    let initial = Advertised { branch: None, target: None };
+    let first = record_ref(initial, retained, target, branch, target).unwrap();
+    let selected = record_ref(first, head, branch, branch, target).unwrap();
+    let actual = retained_branch(selected, retained);
+    assert(actual == Ok::<Option<&str>, &str>(Some(head)));
+    let selected = Advertised { branch: Some(head), target: Some(retained) };
+    let actual = record_ref(selected, head, branch, branch, target);
+    assert(actual.is_err());
+    let selected = Advertised { branch: None, target: Some(retained) };
+    let actual = record_ref(selected, head, other, branch, target);
+    assert(actual.is_err());
+    let missing = Advertised { branch: Some(head), target: None };
+    let actual = retained_branch(missing, retained);
+    assert(actual.is_err());
+    let actual = already_absent(Some(head), head, false);
+    assert(actual == Ok::<bool, &str>(false));
+    let actual = already_absent(None, head, true);
+    assert(actual == Ok::<bool, &str>(true));
+    let actual = already_absent(None, head, false);
+    assert(actual.is_err());
+}
+}

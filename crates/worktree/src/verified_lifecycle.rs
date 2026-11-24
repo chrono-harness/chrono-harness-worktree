@@ -6,6 +6,16 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 #[cfg(verus_keep_ghost)]
+#[path = "remote.rs"]
+pub mod remote;
+#[cfg(not(verus_keep_ghost))]
+pub use crate::remote::{Advertised, already_absent, record_ref, retained_branch, single_endpoint};
+#[cfg(all(not(verus_keep_ghost), feature = "remote-observation-test"))]
+pub use crate::remote::{RemoteCheck, RemoteSelection};
+#[cfg(verus_keep_ghost)]
+pub use remote::{Advertised, already_absent, record_ref, retained_branch, single_endpoint};
+
+#[cfg(verus_keep_ghost)]
 #[path = "maintenance.rs"]
 mod maintenance_verification;
 #[cfg(not(verus_keep_ghost))]
