@@ -1,0 +1,18 @@
+name: 提出改进
+description: 需要新增或改进现有能力。
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: 谁需要这项改进？
+      description: 描述使用者、使用场景和当前困难。
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 怎样算完成？
+      description: 说明能实际观察或验证的结果。
+    validations:
+      required: true

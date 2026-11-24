@@ -1,0 +1,11 @@
+name: 提出问题
+description: 需要理解用法、行为或设计选择。
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: 想了解什么？
+      description: 描述你的使用场景和具体问题。
+    validations:
+      required: true
