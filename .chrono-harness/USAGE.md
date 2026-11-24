@@ -14,4 +14,4 @@
 
 ## 本仓验证
 
-产品位于 [`crates/worktree`](../crates/worktree)。原生测试位于 [`crates/worktree-tests`](../crates/worktree-tests)。在仓库根目录运行 `mise exec -- ./check.sh` 执行本仓的检查。
+产品位于 [`crates/worktree`](../crates/worktree)。原生测试位于 [`crates/worktree-tests`](../crates/worktree-tests)。在仓库根目录运行 `mise exec -- ./check.sh` 执行本仓的检查。 本地和 GitHub 使用同一份 Git DELTA、证明根与原生测试登记。单元执行所有者发布、生命周期、待办提醒的三对 Verus 根和原生测试，汇总作业读取原件。
