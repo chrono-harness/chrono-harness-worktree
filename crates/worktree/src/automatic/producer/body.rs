@@ -82,7 +82,7 @@ fn input(path: &Path) -> Result<(String, u64), String> {
     if !m.is_file() {
         return Err("copied fixture input must be a regular file; preserve it".into());
     }
-    let (digest, _) = chrono_harness::file_identity(path)?;
+    let (digest, _) = crate::document::file_identity(path)?;
     Ok((digest, m.len()))
 }
 
@@ -823,7 +823,7 @@ pub(super) fn drain(
                 .to_str()
                 .ok_or("report overlap path UTF-8")?;
             let _retention = crate::removal::Guard::one(&report_root, report_member)?;
-            match chrono_harness::artifact_disposal::dispose_entry(
+            match crate::artifact_disposal::dispose_entry(
                 &allocation,
                 member,
                 // Custody's durable member identity is device:inode. Its

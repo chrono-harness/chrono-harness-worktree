@@ -103,6 +103,10 @@ mod remote;
 #[cfg(not(verus_keep_ghost))]
 mod removal;
 #[cfg(not(verus_keep_ghost))]
+mod retention;
+#[cfg(not(verus_keep_ghost))]
+mod retention_session;
+#[cfg(not(verus_keep_ghost))]
 mod start;
 #[allow(unexpected_cfgs)]
 #[cfg(not(verus_keep_ghost))]
@@ -114,7 +118,9 @@ pub mod verified_lifecycle;
 #[cfg(not(verus_keep_ghost))]
 pub mod verified_owner_publication;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{CliOutput, decode, no_symlink_parents, relative_path};
+use crate::document::{decode, no_symlink_parents, relative_path};
+#[cfg(not(verus_keep_ghost))]
+use chrono_harness::CliOutput;
 #[cfg(not(verus_keep_ghost))]
 mod fetch_recovery;
 #[cfg(not(verus_keep_ghost))]
@@ -367,7 +373,7 @@ fn configuration(root: &Path, config_path: &str) -> Result<(Config, Vec<u8>), St
         check_inputs::validate(p)?;
     }
     if (config.schema == "chrono-worktree-config/v1"
-        && chrono_harness::json(&bytes)?.get("check_inputs").is_some())
+        && crate::document::json(&bytes)?.get("check_inputs").is_some())
         || (config.schema == "chrono-worktree-config/v2" && config.check_inputs.is_none())
     {
         return Err("worktree v2 requires check_inputs; v1 does not accept it".into());

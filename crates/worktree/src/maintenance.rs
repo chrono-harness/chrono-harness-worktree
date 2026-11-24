@@ -22,6 +22,8 @@ pub fn retained_reference_ancestor_required(reference_matches: bool, allow_advan
 #[cfg(not(verus_keep_ghost))]
 use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
+use crate::document::{decode, json, relative_path};
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::{
@@ -29,7 +31,7 @@ use crate::{
     start::{self, Runner},
 };
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{decode, facts, json, relative_path};
+use chrono_harness::facts;
 #[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
 #[cfg(not(verus_keep_ghost))]

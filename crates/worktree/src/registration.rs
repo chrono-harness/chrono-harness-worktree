@@ -1,7 +1,6 @@
 //! Worktree passes fixed host data to the installed registration command.
-use chrono_harness::{
-    CommandSpec, decode, file_identity, resolve_program, run_process_observed_data,
-};
+use crate::document::{decode, file_identity};
+use chrono_harness::{CommandSpec, resolve_program, run_process_observed_data};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -54,6 +53,7 @@ impl Client {
             .len()
             .checked_add(256)
             .ok_or("registration response bound overflow")?;
+        let _custody = crate::retention::forward_scope()?;
         let r = run_process_observed_data(&self.root, &self.command, &bytes, &self.digest, bound)?;
         if let Some(failure) = r.failure {
             return Err(failure);

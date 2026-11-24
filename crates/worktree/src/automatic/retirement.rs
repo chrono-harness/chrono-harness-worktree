@@ -35,7 +35,7 @@ pub fn retire_cache_history(completed: bool, generation: u64, current_generation
 #[cfg(not(verus_keep_ghost))]
 use super::*;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{artifact_disposal as disposal, ownership::DirectoryLease};
+use crate::{artifact_disposal as disposal, ownership::DirectoryLease};
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

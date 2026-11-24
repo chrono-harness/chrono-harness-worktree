@@ -334,7 +334,7 @@ fn strict_evidence<'de, D>(d: D) -> Result<BTreeMap<String, Value>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    serde_json::from_value(chrono_harness::strict_json_value(d)?).map_err(serde::de::Error::custom)
+    serde_json::from_value(crate::document::strict_json_value(d)?).map_err(serde::de::Error::custom)
 }
 
 // Immutable namespace identity. Membership and mutable state live only in the
@@ -380,7 +380,7 @@ struct Store {
 // publishing the named lease cannot expose an unlocked, unexplained birth to
 // another ordinary publisher. This gate never creates or adopts an owner file.
 #[cfg(not(verus_keep_ghost))]
-struct DirectoryGate(chrono_harness::ownership::DirectoryLease);
+struct DirectoryGate(crate::ownership::DirectoryLease);
 
 #[cfg(not(verus_keep_ghost))]
 impl DirectoryGate {
@@ -408,7 +408,7 @@ impl DirectoryGate {
     }
 
     fn available(directory: &Path) -> Result<Option<Self>, String> {
-        chrono_harness::ownership::DirectoryLease::acquire(directory, true, None)
+        crate::ownership::DirectoryLease::acquire(directory, true, None)
             .map(|lease| lease.map(Self))
     }
     fn stable(&self) -> Result<(), String> {
@@ -1549,6 +1549,7 @@ impl TemporaryHost {
         command.env("TMPDIR", &self.path);
         // Lease is !Send and already owns a scope in this thread. Forward it
         // once; adding the explicit lease here duplicates that same capability.
+        let _custody = crate::retention::forward_scope()?;
         chrono_harness::process_fds::forward_command(command, &[])
     }
 

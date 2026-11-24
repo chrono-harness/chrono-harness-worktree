@@ -81,15 +81,15 @@ pub fn select_report_input_scope<S, T, R, E, O, P, C>(
 }
 
 #[cfg(not(verus_keep_ghost))]
+use crate::document::no_symlink_parents;
+#[cfg(not(verus_keep_ghost))]
 use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::{Config, Start};
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{
-    CommandSpec, ProcessResult, facts, no_symlink_parents, observation, run_process_observed,
-};
+use chrono_harness::{CommandSpec, ProcessResult, facts, observation, run_process_observed};
 #[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json as value};
 #[cfg(not(verus_keep_ghost))]
@@ -109,7 +109,7 @@ pub(crate) struct Runner {
     registration_client: Option<Arc<crate::registration::Client>>,
     pub(crate) config: Config,
     pub(crate) birth_lease: Option<crate::ownership::Lease>,
-    pub(crate) coordinator_inputs: Option<chrono_harness::retained_artifacts::retention::ReadScope>,
+    pub(crate) coordinator_inputs: Option<crate::retention::ReadScope>,
     pub(crate) environment: BTreeMap<String, String>,
     tool: observation::Tool,
     processes: Vec<Value>,
@@ -179,6 +179,7 @@ impl Runner {
             timeout_seconds: self.config.timeout_seconds,
             output_limit_bytes: self.config.output_limit_bytes,
         };
+        let _custody = crate::retention::forward_scope()?;
         let result = match input_limit {
             Some(limit) => chrono_harness::run_process_observed_data(
                 root,
@@ -439,7 +440,7 @@ pub(crate) fn paths(bytes: Vec<u8>) -> Result<BTreeSet<String>, String> {
     }
     let mut paths = BTreeSet::new();
     for path in text.split('\0').filter(|p| !p.is_empty()) {
-        chrono_harness::relative_path(path)?;
+        crate::document::relative_path(path)?;
         if !paths.insert(path.to_string()) {
             return Err("duplicate Git path".into());
         }
@@ -822,12 +823,13 @@ pub(crate) fn with_report_for_consumer<T>(
             &config.git.program,
             Some(environment.get("PATH").map(String::as_str).unwrap_or("")),
         )?;
-        let observed = chrono_harness::file_identity(&path)?.0;
+        let observed = crate::document::file_identity(&path)?.0;
         if config.git.sha256.as_deref() != Some(observed.as_str()) {
             return Err("Git executable digest mismatch before version probe".into());
         }
     }
     // Tool observation retains a failed version process instead of converting it into a success.
+    let _custody = crate::retention::forward_scope()?;
     let tool = observation::tool(
         &root,
         &config.git.program,
@@ -891,11 +893,7 @@ pub(crate) fn with_report_for_consumer<T>(
         runner.config.report_directory.trim_end_matches('/'),
     )?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let output_path = chrono_harness::retained_artifacts::retention::unique_path(
-        &dir,
-        &format!("{operation}-"),
-        ".json",
-    )?;
+    let output_path = crate::retention::unique_path(&dir, &format!("{operation}-"), ".json")?;
     let name = output_path
         .file_stem()
         .ok_or("report name")?
@@ -908,7 +906,7 @@ pub(crate) fn with_report_for_consumer<T>(
         .to_str()
         .ok_or("report path UTF8")?
         .to_string();
-    let report_publication = chrono_harness::retained_artifacts::retention::create_adopted(
+    let report_publication = crate::retention::create_adopted(
         &publication_root,
         "lifecycle-original",
         &output_path,
@@ -922,24 +920,9 @@ pub(crate) fn with_report_for_consumer<T>(
         (),
         operation,
         report_publication.as_ref(),
-        |(), publication| {
-            (
-                (),
-                chrono_harness::retained_artifacts::retention::published_output_scope(publication),
-            )
-        },
-        |(), publication| {
-            (
-                (),
-                chrono_harness::retained_artifacts::retention::publication_read_scope(publication),
-            )
-        },
-        |()| {
-            (
-                (),
-                chrono_harness::retained_artifacts::retention::read_scope(root),
-            )
-        },
+        |(), publication| ((), crate::retention::published_output_scope(publication)),
+        |(), publication| ((), crate::retention::publication_read_scope(publication)),
+        |()| ((), crate::retention::read_scope(root)),
     );
     let _read_scope = read_scope?;
     let mut output = fs::OpenOptions::new()

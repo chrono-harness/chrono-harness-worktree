@@ -59,7 +59,9 @@ pub fn imported_policy_receipt_valid(receipt: &ImportedPolicyReceipt, published:
 #[cfg(not(verus_keep_ghost))]
 use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{decode, facts, json, no_symlink_parents, relative_path};
+use crate::document::{decode, json, no_symlink_parents, relative_path};
+#[cfg(not(verus_keep_ghost))]
+use chrono_harness::facts;
 #[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
 #[cfg(not(verus_keep_ghost))]
@@ -104,10 +106,8 @@ pub(crate) fn state_bytes_for_consumer(
     consumer: Option<&str>,
 ) -> Result<Vec<u8>, String> {
     let _input = match consumer {
-        Some(consumer) => chrono_harness::retained_artifacts::retention::consumer_read_guard(
-            root, path, consumer,
-        )?,
-        None => chrono_harness::retained_artifacts::retention::read_guard(root, path)?,
+        Some(consumer) => crate::retention::consumer_read_guard(root, path, consumer)?,
+        None => crate::retention::read_guard(root, path)?,
     };
     fs::read(state_path(root, path)?).map_err(|e| e.to_string())
 }
@@ -335,16 +335,14 @@ pub(crate) fn publish_fields(
     let target = state_path(root, &path)?;
     let mut bytes = serde_json::to_vec_pretty(&intent).map_err(|e| e.to_string())?;
     bytes.push(b'\n');
-    if chrono_harness::retained_artifacts::retention::publish_owned_original(
+    if crate::retention::publish_owned_original(
         root,
         "lifecycle-original",
         &path,
         &bytes,
         value!({"kind":"recovery-intent","completion":"not-established"}),
     )? {
-        if let Some(inventory) =
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(root)?
-        {
+        if let Some(inventory) = crate::retention::Inventory::adopted(root)? {
             inventory.reference_paths(
                 &format!("recovery:{}", intent["report_path"].as_str().unwrap()),
                 &[path.clone(), intent["report_path"].as_str().unwrap().into()],
@@ -386,7 +384,7 @@ pub(crate) struct Evidence {
     intent_bytes: Vec<u8>,
     result_path: String,
     result_bytes: Option<Vec<u8>>,
-    _retention: Vec<chrono_harness::ownership::Lease>,
+    _retention: Vec<crate::retention::Guard>,
 }
 #[cfg(not(verus_keep_ghost))]
 impl Evidence {
@@ -581,9 +579,7 @@ fn observe_result_kind(
     }
     let mut retention = Vec::new();
     for original in [path, result_path] {
-        if let Some(guard) =
-            chrono_harness::retained_artifacts::retention::read_guard(root, original)?
-        {
+        if let Some(guard) = crate::retention::read_guard(root, original)? {
             retention.push(guard);
         }
     }
@@ -602,7 +598,7 @@ fn observe_result_kind(
 #[cfg(not(verus_keep_ghost))]
 pub(crate) fn protect_report_consumer(
     report: &mut Value,
-    publication: Option<&chrono_harness::retained_artifacts::retention::Publication>,
+    publication: Option<&crate::retention::Publication>,
     consumer: Option<&str>,
 ) -> Result<(), String> {
     if let Some(consumer) = consumer {
@@ -695,9 +691,7 @@ pub(crate) fn original_paths(root: &Path, report: &Value) -> Result<Vec<String>,
 pub(crate) fn release_managed_process_original(root: &Path, report: &Value) -> Result<(), String> {
     if let Some(path) = report["managed_process_original"]["path"].as_str() {
         state_path(root, path)?;
-        if let Some(inventory) =
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(root)?
-        {
+        if let Some(inventory) = crate::retention::Inventory::adopted(root)? {
             inventory.reference_paths(&format!("recovery:{path}"), &[])?;
         }
     }
@@ -718,9 +712,7 @@ pub(crate) fn bind_report_inputs_for_consumer(
     report: &Value,
     consumer: Option<&str>,
 ) -> Result<(), String> {
-    if let Some(inventory) =
-        chrono_harness::retained_artifacts::retention::Inventory::adopted(root)?
-    {
+    if let Some(inventory) = crate::retention::Inventory::adopted(root)? {
         let path = report["report_path"]
             .as_str()
             .ok_or("lifecycle result path")?;
@@ -734,7 +726,7 @@ pub(crate) fn bind_report_inputs_for_consumer(
 /// Retention already collects unrooted cycles: neither direction is a root.
 #[cfg(not(verus_keep_ghost))]
 fn bind_result_handoffs(
-    inventory: &chrono_harness::retained_artifacts::retention::Inventory,
+    inventory: &crate::retention::Inventory,
     root: &Path,
     report: &Value,
     consumer: Option<&str>,
@@ -759,8 +751,7 @@ fn bind_result_handoffs(
 /// A failed rebind has an explicit resume consumer and keeps that root.
 #[cfg(not(verus_keep_ghost))]
 pub(crate) fn settle_report(root: &Path, report: &Value) -> Result<(), String> {
-    let Some(inventory) = chrono_harness::retained_artifacts::retention::Inventory::adopted(root)?
-    else {
+    let Some(inventory) = crate::retention::Inventory::adopted(root)? else {
         return Ok(());
     };
     let path = report["report_path"]

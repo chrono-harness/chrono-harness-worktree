@@ -162,18 +162,13 @@ fn produce(
     if req.source != "local" || req.prepared.is_some() || config.host_config != req.host_config {
         return Err("local input source/host binding mismatch".into());
     }
-    let _read_scope = chrono_harness::retained_artifacts::retention::read_scope(&req.host_root)?;
-    let retention =
-        chrono_harness::retained_artifacts::retention::Inventory::adopted(&req.host_root)?;
+    let _read_scope = crate::retention::read_scope(&req.host_root)?;
+    let retention = crate::retention::Inventory::adopted(&req.host_root)?;
     let consumer = retention
         .as_ref()
         .map(|_| {
-            chrono_harness::retained_artifacts::retention::unique_path(
-                &req.host_root,
-                "local-inputs-",
-                "",
-            )
-            .map(|path| path.file_name().unwrap().to_str().unwrap().to_string())
+            crate::retention::unique_path(&req.host_root, "local-inputs-", "")
+                .map(|path| path.file_name().unwrap().to_str().unwrap().to_string())
         })
         .transpose()?;
     let report = start::with_report_for_consumer(
@@ -363,6 +358,7 @@ fn produce(
                                     r.config.output_limit_bytes,
                                     &r.environment,
                                     |command, input| {
+                                        let _custody = crate::retention::forward_scope()?;
                                         let result =
                                             chrono_harness::run_process(root, command, input)?;
                                         Ok((

@@ -177,22 +177,24 @@ impl Manager {
             .inputs
             .values()
             .flatten()
-            .all(|digest| chrono_harness::verified_identifiers::valid_digest_text(digest));
+            .all(|digest| crate::document::valid_digest(digest));
         let (source_inputs, source_keys_valid, source_digests_valid) =
             if let Some(source) = &binding.policy_source {
                 facts::full_oid(&source.head)?;
                 (
                     &source.inputs,
                     source.inputs.keys().eq(binding.inputs.keys()),
-                    source.inputs.values().flatten().all(|digest| {
-                        chrono_harness::verified_identifiers::valid_digest_text(digest)
-                    }),
+                    source
+                        .inputs
+                        .values()
+                        .flatten()
+                        .all(|digest| crate::document::valid_digest(digest)),
                 )
             } else {
                 (&binding.inputs, true, true)
             };
         if let Some(error) = adopted_policy_binding_error(
-            chrono_harness::verified_identifiers::valid_digest_text(&binding.policy_sha256),
+            crate::document::valid_digest(&binding.policy_sha256),
             input_keys_valid,
             input_digests_valid,
             source_keys_valid,
@@ -442,10 +444,7 @@ impl Manager {
         let _migration_original = receipt
             .as_ref()
             .map(|receipt| {
-                chrono_harness::retained_artifacts::retention::read_guard(
-                    &self.inputs.policy.coordinator_root,
-                    &receipt.path,
-                )
+                crate::retention::read_guard(&self.inputs.policy.coordinator_root, &receipt.path)
             })
             .transpose()?;
         // A published receipt alone is not adoption. Admission and the original

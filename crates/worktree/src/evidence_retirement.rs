@@ -1,4 +1,5 @@
 //! Finite current custody of released file aliases; original outcomes remain data.
+use crate::document::{file_identity, no_symlink_parents, relative_path};
 use crate::registration::Registrations;
 use crate::{
     automatic::EvidenceExclusion,
@@ -6,7 +7,6 @@ use crate::{
     recovery::state_bytes,
     start::{self, Runner},
 };
-use chrono_harness::{file_identity, no_symlink_parents, relative_path};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -83,7 +83,7 @@ fn verified(root: &Path, path: &str, expected: &Original) -> Result<(PathBuf, St
     if signature(&file.metadata().map_err(|e| e.to_string())?)? != before {
         return Err(format!("evidence file changed before read: {path}"));
     }
-    if chrono_harness::copy_hashed(&file, std::io::sink())?
+    if crate::document::copy_hashed(&file, std::io::sink())?
         != (expected.sha256.clone(), expected.length)
         || signature(&file.metadata().map_err(|e| e.to_string())?)? != before
         || signature(&fs::symlink_metadata(&physical).map_err(|e| e.to_string())?)? != before
@@ -127,7 +127,7 @@ impl Custody {
             if !selected.insert(object.original.path.as_str())
                 || object.owner.trim().is_empty()
                 || object.reason.trim().is_empty()
-                || !chrono_harness::wire::is_digest(&object.original.sha256)
+                || !crate::document::valid_digest(&object.original.sha256)
             {
                 return Err("repeated or incomplete evidence custody member".into());
             }

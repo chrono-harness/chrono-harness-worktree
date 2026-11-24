@@ -392,10 +392,7 @@ fn linked_retention_status(
     }
     // Opening Inventory can create its namespace. Only inspect adoption here;
     // absent policies need no attachment probes, and foreign roots get no writes.
-    let policy = no_symlink_parents(
-        path,
-        chrono_harness::retained_artifacts::retention::POLICY_PATH,
-    )?;
+    let policy = no_symlink_parents(path, crate::retention::POLICY_PATH)?;
     match fs::symlink_metadata(policy) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok("not-adopted"),
         Err(error) => return Err(error.to_string()),
@@ -456,6 +453,7 @@ fn maintain_logs(
             r.config.output_limit_bytes,
             &r.environment,
             |command| {
+                let _custody = crate::retention::forward_scope()?;
                 let p = chrono_harness::run_process(coordinator, command, &[])?;
                 Ok((p.exit_code, p.stdout_bytes, p.stderr_bytes))
             },
@@ -495,18 +493,19 @@ fn maintain_retention_inventory(
         Err(error) => return Err(error.to_string()),
     }
     let root = absolute(root, false)?;
-    let Some(owner) = chrono_harness::retained_artifacts::retention::Inventory::adopted(&root)?
-    else {
-        inventory.retention(
-            &root,
-            value!({"kind":"source-result","status":"not-adopted"}),
-        );
-        return Ok(None);
-    };
-    let result = owner.maintain_explicit_observed(|row| {
-        inventory.retention(&root, row.clone());
-        Ok(())
-    })?;
+    match fs::symlink_metadata(root.join(".chrono-harness/retention.json")) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            inventory.retention(
+                &root,
+                value!({"kind":"source-result","status":"not-adopted"}),
+            );
+            return Ok(None);
+        }
+        Err(error) => return Err(error.to_string()),
+        Ok(_) => {}
+    }
+    let result = crate::retention_session::Session::open(&root)?
+        .observe_maintenance(|row| inventory.retention(&root, row))?;
     // Individual observations are already complete above. Keep source accounting
     // and quota errors without duplicating the compact samples in the parent.
     let mut summary = result.clone();

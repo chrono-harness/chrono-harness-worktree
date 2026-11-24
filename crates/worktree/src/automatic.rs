@@ -431,6 +431,8 @@ impl EvidenceExclusion {
 #[cfg(not(verus_keep_ghost))]
 use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
+use crate::document::{decode, json, no_symlink_parents, relative_path};
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::verified_owner_publication::{PolicyNamespace, policy_namespace_matches};
@@ -442,7 +444,7 @@ use crate::{
     start::{self, Runner},
 };
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{CommandSpec, decode, facts, json, no_symlink_parents, relative_path};
+use chrono_harness::{CommandSpec, facts};
 #[cfg(not(verus_keep_ghost))]
 pub use producer::{RetainedArtifact, TemporaryHost};
 #[cfg(not(verus_keep_ghost))]
@@ -693,7 +695,7 @@ struct Gate {
     path: PathBuf,
     token: String,
     lease: Option<Lease>,
-    directory: Option<chrono_harness::ownership::DirectoryLease>,
+    directory: Option<crate::ownership::DirectoryLease>,
 }
 #[cfg(not(verus_keep_ghost))]
 impl Gate {
@@ -965,7 +967,7 @@ impl ManagedProcessOriginals {
             .to_str()
             .ok_or("managed process directory UTF-8")?;
         chrono_harness::verified_verifier::bind_compiler_directory(&mut command.args, directory);
-        let digest = chrono_harness::file_identity(Path::new(&command.program))?.0;
+        let digest = crate::document::file_identity(Path::new(&command.program))?.0;
         let intent = value!({"schema":"chrono-worktree-managed-process-intent/v1",
             "cwd":target,"program":command.program,"argv":command.args,
             "environment_sha256":crate::document::digest(&command.env)?,
@@ -976,6 +978,7 @@ impl ManagedProcessOriginals {
             "wait":"original runner native join; absent result remains unknown"});
         self.record("intent.json", &intent)?;
         let paths = ["stdout", "stderr", "launch.json"].map(|name| self.directory.join(name));
+        let _custody = crate::retention::forward_scope()?;
         let process = chrono_harness::prepared::process_identities(
             chrono_harness::run_process_observed_retained(
                 target,
@@ -1017,7 +1020,7 @@ impl ManagedProcessOriginals {
                 process.stderr_bytes.len(),
             ),
         ] {
-            let (actual, actual_length) = chrono_harness::file_identity(path)?;
+            let (actual, actual_length) = crate::document::file_identity(path)?;
             if actual != *expected || actual_length != length as u64 {
                 return Err("managed process stream differs from returned original".into());
             }
@@ -1663,10 +1666,8 @@ impl Observation<'_> {
                     .admission_id
                     .as_deref()
                     .ok_or("missing enrollment metadata identity")?;
-                let observed = chrono_harness::ownership::identity(&no_symlink_parents(
-                    &record,
-                    "metadata.lease",
-                )?)?;
+                let observed =
+                    crate::ownership::identity(&no_symlink_parents(&record, "metadata.lease")?)?;
                 (
                     value!({"schema":"chrono-worktree-enrollment-owner/v2",
                     "coordinator_root":self.inputs.policy.coordinator_root,"common":self.inputs.common,
@@ -1990,9 +1991,7 @@ impl Manager {
         if coordinator != invoking && r.coordinator_inputs.is_none() {
             // Maintain a distinct coordinator once and retain only this
             // invocation's explicitly read originals until publication.
-            r.coordinator_inputs = Some(chrono_harness::retained_artifacts::retention::read_scope(
-                coordinator,
-            )?);
+            r.coordinator_inputs = Some(crate::retention::read_scope(coordinator)?);
         }
         Ok(())
     }
@@ -2082,7 +2081,7 @@ impl Manager {
         let kernel = policy.schema == "chrono-worktree-automatic-cleanup/v2";
         let directory_lease = if kernel {
             Some(
-                chrono_harness::ownership::DirectoryLease::acquire(
+                crate::ownership::DirectoryLease::acquire(
                     &record_directory,
                     true,
                     wait.then_some(std::time::Duration::from_secs(r.config.timeout_seconds)),
@@ -2360,9 +2359,9 @@ impl Manager {
         ))
     }
     fn protect_originals(&self) -> Result<(), String> {
-        if let Some(inventory) = chrono_harness::retained_artifacts::retention::Inventory::adopted(
-            &self.inputs.policy.coordinator_root,
-        )? {
+        if let Some(inventory) =
+            crate::retention::Inventory::adopted(&self.inputs.policy.coordinator_root)?
+        {
             let paths = self
                 .original_paths(&self.ledger)?
                 .into_iter()
@@ -2392,22 +2391,20 @@ impl Manager {
                     serde_json::from_value(self.ledger.entries[i].enrollment[field].clone())
                         .map_err(|e| format!("invalid pending result handoff: {e}"))?;
                 for receipt in receipts {
-                    let _receipt_input =
-                        chrono_harness::retained_artifacts::retention::consumer_read_guard(
-                            &self.inputs.policy.coordinator_root,
-                            &receipt.path,
-                            &role,
-                        )?;
+                    let _receipt_input = crate::retention::consumer_read_guard(
+                        &self.inputs.policy.coordinator_root,
+                        &receipt.path,
+                        &role,
+                    )?;
                     let original = json(&self.receipt(&receipt)?)?;
                     if let Some(path) = original["report_path"].as_str() {
                         let physical =
                             no_symlink_parents(&self.inputs.policy.coordinator_root, path)?;
-                        let _input =
-                            chrono_harness::retained_artifacts::retention::consumer_read_guard(
-                                &self.inputs.policy.coordinator_root,
-                                path,
-                                &role,
-                            )?;
+                        let _input = crate::retention::consumer_read_guard(
+                            &self.inputs.policy.coordinator_root,
+                            path,
+                            &role,
+                        )?;
                         match fs::read(physical) {
                             Ok(bytes) => {
                                 if let Ok(report) = json(&bytes) {
@@ -2420,9 +2417,17 @@ impl Manager {
                                         )
                                         && report[binding] == value!(receipt);
                                     if matches {
-                                        if let Some(inventory) = chrono_harness::retained_artifacts::retention::Inventory::adopted(&self.inputs.policy.coordinator_root)? {
-                                        matches = inventory.published_original(path, &sha256(&bytes), bytes.len() as u64)?;
-                                    }
+                                        if let Some(inventory) =
+                                            crate::retention::Inventory::adopted(
+                                                &self.inputs.policy.coordinator_root,
+                                            )?
+                                        {
+                                            matches = inventory.published_original(
+                                                path,
+                                                &sha256(&bytes),
+                                                bytes.len() as u64,
+                                            )?;
+                                        }
                                     }
                                     if matches {
                                         crate::recovery::bind_report_inputs_for_consumer(
@@ -2465,9 +2470,7 @@ impl Manager {
     /// identity, ownership and Git checks in the normal execution path.
     fn reconcile_cleanup_results(&mut self) -> Result<(), String> {
         let root = self.inputs.policy.coordinator_root.clone();
-        let Some(inventory) =
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(&root)?
-        else {
+        let Some(inventory) = crate::retention::Inventory::adopted(&root)? else {
             return Ok(());
         };
         let role = self.original_role()?;
@@ -2492,11 +2495,7 @@ impl Manager {
             if attempt.path != format!("{}{}.json", config.report_directory, attempt.token) {
                 return Err("cleanup result path differs from its recorded invocation".into());
             }
-            let _input = chrono_harness::retained_artifacts::retention::consumer_read_guard(
-                &root,
-                &attempt.path,
-                &role,
-            )?;
+            let _input = crate::retention::consumer_read_guard(&root, &attempt.path, &role)?;
             let bytes =
                 crate::recovery::state_bytes_for_consumer(&root, &attempt.path, Some(&role))?;
             let report = json(&bytes)?;
@@ -2540,7 +2539,7 @@ impl Manager {
         entry: &Entry,
         terminal: &Terminal,
         terminal_bytes: &[u8],
-        inventory: &chrono_harness::retained_artifacts::retention::Inventory,
+        inventory: &crate::retention::Inventory,
         role: &str,
     ) -> Result<bool, String> {
         if entry.status != "disposed" || !terminal.artifacts_only || terminal.dispose_evidence {
@@ -2559,16 +2558,12 @@ impl Manager {
             return Ok(false);
         }
         let root = &self.inputs.policy.coordinator_root;
-        let _cleanup = chrono_harness::retained_artifacts::retention::consumer_read_guard(
-            root,
-            &receipt.path,
-            role,
-        )?;
+        let _cleanup = crate::retention::consumer_read_guard(root, &receipt.path, role)?;
         let bytes = self.receipt(receipt)?;
         if !inventory.published_original(&receipt.path, &receipt.sha256, bytes.len() as u64)? {
             return Ok(false);
         }
-        let source = inventory.producer_status("lifecycle-original", Some(&receipt.path))?;
+        let source = inventory.producer_status("lifecycle-original", &receipt.path)?;
         let result = json(&bytes)?;
         Ok(source["records"].as_array().is_some_and(|records|
             matches!(records.as_slice(), [r] if r["phase"] == "released" && r["sealed"] == true))
@@ -2600,11 +2595,7 @@ impl Manager {
                 continue;
             };
             let terminal_input =
-                chrono_harness::retained_artifacts::retention::consumer_read_guard(
-                    root,
-                    &terminal.receipt.path,
-                    &role,
-                )?;
+                crate::retention::consumer_read_guard(root, &terminal.receipt.path, &role)?;
             let bytes = self.receipt(&terminal.receipt)?;
             let original = json(&bytes)?;
             if original["schema"] == "chrono-worktree-absent-adoption-receipt/v1" {
@@ -2638,9 +2629,7 @@ impl Manager {
                     "terminal original does not establish this attachment's handoff".into(),
                 );
             }
-            if let Some(inventory) =
-                chrono_harness::retained_artifacts::retention::Inventory::adopted(root)?
-            {
+            if let Some(inventory) = crate::retention::Inventory::adopted(root)? {
                 if !inventory.published_original(
                     &terminal.receipt.path,
                     &terminal.receipt.sha256,
@@ -2716,10 +2705,7 @@ impl Manager {
         // An optional retention owner supplies the identity-bound original.
         // Other hosts retain their existing current-target validation path.
         let managed_originals = if imported && maintenance {
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(
-                &self.inputs.policy.coordinator_root,
-            )?
-            .is_some()
+            crate::retention::Inventory::adopted(&self.inputs.policy.coordinator_root)?.is_some()
         } else {
             false
         };
@@ -2775,19 +2761,14 @@ impl Manager {
                         .as_str()
                         .ok_or("import enrollment lacks its original report path")?;
                     _original_guard =
-                        chrono_harness::retained_artifacts::retention::consumer_read_guard(
-                            &root,
-                            path,
-                            &self.original_role()?,
-                        )?;
+                        crate::retention::consumer_read_guard(&root, path, &self.original_role()?)?;
                     let bytes = crate::recovery::state_bytes_for_consumer(
                         &root,
                         path,
                         Some(&self.original_role()?),
                     )?;
-                    let inventory =
-                        chrono_harness::retained_artifacts::retention::Inventory::adopted(&root)?
-                            .ok_or("import policy restoration requires its published original")?;
+                    let inventory = crate::retention::Inventory::adopted(&root)?
+                        .ok_or("import policy restoration requires its published original")?;
                     let published =
                         inventory.published_original(path, &sha256(&bytes), bytes.len() as u64)?;
                     let report = json(&bytes)?;
@@ -2944,9 +2925,7 @@ impl Manager {
     }
     fn save(&self) -> Result<(), String> {
         let path = self.update_path()?;
-        let inventory = chrono_harness::retained_artifacts::retention::Inventory::adopted(
-            &self.inputs.policy.coordinator_root,
-        )?;
+        let inventory = crate::retention::Inventory::adopted(&self.inputs.policy.coordinator_root)?;
         let Some(inventory) = inventory else {
             return write_json(&path, &self.ledger, false).map(|_| ());
         };
@@ -3426,7 +3405,7 @@ impl Manager {
     fn birth_ready(&self, e: &Entry) -> Result<(), String> {
         self.birth_fact(e).map(|_| ())
     }
-    fn birth_original_guard(&self, e: &Entry) -> Result<Option<Lease>, String> {
+    fn birth_original_guard(&self, e: &Entry) -> Result<Option<crate::retention::Guard>, String> {
         if e.enrollment["kind"] != "birth" || e.adopted_birth.is_some() {
             return Ok(None);
         }
@@ -3437,7 +3416,7 @@ impl Manager {
         };
         let receipt: Receipt = serde_json::from_value(e.enrollment[field].clone())
             .map_err(|_| "birth has no completed original receipt; preserve it")?;
-        chrono_harness::retained_artifacts::retention::consumer_read_guard(
+        crate::retention::consumer_read_guard(
             &self.inputs.policy.coordinator_root,
             &receipt.path,
             &self.original_role()?,
@@ -3504,9 +3483,7 @@ impl Manager {
             .as_str()
             .ok_or("birth original report path")?;
         relative_path(report)?;
-        if let Some(inventory) =
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(source)?
-        {
+        if let Some(inventory) = crate::retention::Inventory::adopted(source)? {
             inventory.reference_paths(&format!("recovery:{report}"), &[])?;
         }
         lease.stable()
@@ -3640,21 +3617,22 @@ impl Manager {
             }
             return Ok(());
         }
-        let inventory = chrono_harness::retained_artifacts::retention::Inventory::adopted(root)?;
-        if let Some(inventory) = inventory.filter(|i| i.accepts("lifecycle-original", path)) {
+        let inventory = crate::retention::Inventory::adopted(root)?;
+        if let Some(inventory) = inventory
+            && inventory.accepts("lifecycle-original", path)?
+        {
             let dependencies = receipt
                 .map(|v| crate::recovery::original_paths(root, v))
                 .transpose()?
                 .unwrap_or_default();
-            let publication = inventory.plan(
+            let publication = inventory.create_referenced(
                 "lifecycle-original",
                 path,
-                false,
+                &self.original_role()?,
                 value!({"kind":"automatic-original","completion":"not-established"}),
             )?;
-            publication.materialize_for_reference(&self.original_role()?)?;
             publication.replace_file(&target, bytes)?;
-            chrono_harness::retained_artifacts::retention::Inventory::adopted(root)?
+            crate::retention::Inventory::adopted(root)?
                 .ok_or("automatic original retention disappeared")?
                 .dependencies_paths(path, &dependencies)?;
             publication.complete(value!({"kind":"automatic-original","publication":"complete"}))?;
@@ -3666,19 +3644,14 @@ impl Manager {
     fn immutable_reconciled(&self, name: &str, value: &Value) -> Result<Receipt, String> {
         let path = format!("{}{name}", self.inputs.policy.state_directory);
         let physical = no_symlink_parents(&self.inputs.policy.coordinator_root, &path)?;
-        let _input = chrono_harness::retained_artifacts::retention::read_guard(
-            &self.inputs.policy.coordinator_root,
-            &path,
-        )?;
+        let _input = crate::retention::read_guard(&self.inputs.policy.coordinator_root, &path)?;
         match fs::read(&physical) {
             Ok(bytes) => {
                 if json(&bytes)? != *value {
                     return Err("interrupted use reconciliation receipt changed".into());
                 }
                 if let Some(inventory) =
-                    chrono_harness::retained_artifacts::retention::Inventory::adopted(
-                        &self.inputs.policy.coordinator_root,
-                    )?
+                    crate::retention::Inventory::adopted(&self.inputs.policy.coordinator_root)?
                 {
                     inventory.dependencies_paths(
                         &path,
