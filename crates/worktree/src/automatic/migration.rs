@@ -177,22 +177,24 @@ impl Manager {
             .inputs
             .values()
             .flatten()
-            .all(|digest| chrono_harness::verified_identifiers::valid_digest_text(digest));
+            .all(|digest| crate::document::valid_digest(digest));
         let (source_inputs, source_keys_valid, source_digests_valid) =
             if let Some(source) = &binding.policy_source {
                 facts::full_oid(&source.head)?;
                 (
                     &source.inputs,
                     source.inputs.keys().eq(binding.inputs.keys()),
-                    source.inputs.values().flatten().all(|digest| {
-                        chrono_harness::verified_identifiers::valid_digest_text(digest)
-                    }),
+                    source
+                        .inputs
+                        .values()
+                        .flatten()
+                        .all(|digest| crate::document::valid_digest(digest)),
                 )
             } else {
                 (&binding.inputs, true, true)
             };
         if let Some(error) = adopted_policy_binding_error(
-            chrono_harness::verified_identifiers::valid_digest_text(&binding.policy_sha256),
+            crate::document::valid_digest(&binding.policy_sha256),
             input_keys_valid,
             input_digests_valid,
             source_keys_valid,
@@ -358,24 +360,13 @@ impl Manager {
         // Ordinary migration has already admitted the target's executable policy.
         // Explicit adoption executes the caller's policy. Its target supplies
         // only the fixed artifact declarations and registered policy paths.
-        let target_config = chrono_harness::facts::selected_config_with(&host_config, |path| {
-            r.blob(&target, &head, path)
-        })?;
+        let target_config =
+            crate::host_config::read(&host_config, |path| r.blob(&target, &head, path))?
+                .into_selected()?;
         let client = r.registration()?;
-        let binding: Value =
-            client.query(&value!({"operation":"custody-config","config":target_config}))?;
-        let filemap_path = binding["filemap_path"]
-            .as_str()
-            .ok_or("registration custody FILEMAP path missing")?;
-        if target_config["registries"]["filemap"] != filemap_path {
-            return Err("registration custody FILEMAP path differs".into());
-        }
-        let target_filemap: Value = decode(&r.blob(&target, &head, filemap_path)?)?;
-        let checked: Value =
-            client.query(&value!({"operation":"custody-filemap","filemap":target_filemap}))?;
-        if checked["valid"] != true {
-            return Err("registration refused custody FILEMAP".into());
-        }
+        let filemap_path = client.custody(&target_config)?;
+        let target_filemap: Value = decode(&r.blob(&target, &head, &filemap_path)?)?;
+        client.custody_filemap(&target_filemap)?;
         artifact_disposal::registered(
             &self
                 .inputs
@@ -442,10 +433,7 @@ impl Manager {
         let _migration_original = receipt
             .as_ref()
             .map(|receipt| {
-                chrono_harness::retained_artifacts::retention::read_guard(
-                    &self.inputs.policy.coordinator_root,
-                    &receipt.path,
-                )
+                crate::retention::read_guard(&self.inputs.policy.coordinator_root, &receipt.path)
             })
             .transpose()?;
         // A published receipt alone is not adoption. Admission and the original

@@ -1,4 +1,4 @@
-use chrono_harness::CommandSpec;
+use crate::process::CommandSpec;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 

@@ -492,7 +492,7 @@ pub(super) fn drain(
             if fs::read(&record_path).map_err(|e| e.to_string())? != record {
                 return Err("rolling allocation references changed before deletion".into());
             }
-            chrono_harness::artifact_disposal::source_safe(&inputs.policy.coordinator_root, &name)
+            crate::artifact_disposal::source_safe(r, &inputs.policy.coordinator_root, &name)
         },
     );
     match effect {
@@ -548,7 +548,7 @@ fn empty_trash(store: &Store, inputs: &PolicyInputs, r: &mut Runner) -> Result<u
         .map_err(|e| e.to_string())?
         .to_str()
         .ok_or("metadata path UTF8")?;
-    chrono_harness::artifact_disposal::source_safe(&inputs.policy.coordinator_root, relative)?;
+    crate::artifact_disposal::source_safe(r, &inputs.policy.coordinator_root, relative)?;
     let mut count = 0;
     for entry in fs::read_dir(&path).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -625,7 +625,7 @@ fn retire(
         {
             return Err("allocation record changed before metadata retirement".into());
         }
-        chrono_harness::artifact_disposal::publish_entry(&active, &archived)?;
+        crate::artifact_disposal::publish_entry(&active, &archived)?;
     } else if active.exists() {
         return Err("retired allocation has an active declaration".into());
     }
@@ -639,7 +639,7 @@ fn retire(
     let destination = trash.join(sha256(object.path.as_bytes()));
     // This atomic handoff moves every receipt and the held allocation lease.
     // Interrupted physical removal is recovered by the constant namespace owner.
-    chrono_harness::artifact_disposal::publish_entry(&metadata, &destination)?;
+    crate::artifact_disposal::publish_entry(&metadata, &destination)?;
     if directory_id(&destination)? != rolling.metadata_identity {
         return Err("retired metadata identity changed".into());
     }

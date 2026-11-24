@@ -102,13 +102,15 @@ pub use automatic_verification::producer::{
 };
 
 #[cfg(not(verus_keep_ghost))]
-pub use crate::automatic::retirement::{retire_cache_history, retire_history};
+pub use crate::automatic::retirement::{expired_original, retire_cache_history, retire_history};
 #[cfg(not(verus_keep_ghost))]
 pub use crate::recovery::{
     ImportedPolicyReceipt, imported_policy_receipt_valid, imported_policy_source_commit,
 };
 #[cfg(verus_keep_ghost)]
-pub use automatic_verification::retirement::{retire_cache_history, retire_history};
+pub use automatic_verification::retirement::{
+    expired_original, retire_cache_history, retire_history,
+};
 #[cfg(verus_keep_ghost)]
 #[path = "recovery.rs"]
 #[rustfmt::skip]

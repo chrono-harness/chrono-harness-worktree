@@ -22,10 +22,11 @@ use crate::document as wire;
 #[cfg(not(verus_keep_ghost))]
 use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{
-    decode, facts, file_identity, no_symlink_parents,
-    prepared::{self, Context, InputRequest, PreparedCheck, Selection},
-    units,
+use crate::facts;
+#[cfg(not(verus_keep_ghost))]
+use crate::{
+    document::{decode, file_identity, no_symlink_parents},
+    prepared::{self, Context, InputRequest, PreparedCheck, Scope, Selection, artifact_path},
 };
 #[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
@@ -81,12 +82,12 @@ impl Policy {
 
 #[cfg(not(verus_keep_ghost))]
 pub(crate) fn validate(policy: &Policy) -> Result<(), String> {
-    units::artifact_path(policy.collection_manifest())?;
+    artifact_path(policy.collection_manifest())?;
     let Policy::Full(p) = policy else {
         return Ok(());
     };
-    units::artifact_path(&p.origin_path)?;
-    units::artifact_path(&p.context_path)?;
+    artifact_path(&p.origin_path)?;
+    artifact_path(&p.context_path)?;
     if !full_paths_distinct(&p.origin_path, &p.context_path, &p.collection_manifest)
         || p.roles.is_empty()
         || p.roles.iter().any(|(k, v)| {
@@ -158,22 +159,17 @@ fn produce(
     config: Config,
     bytes: &[u8],
 ) -> Result<PreparedCheck, String> {
-    req.validate()?;
+    req.validate(&config)?;
     if req.source != "local" || req.prepared.is_some() || config.host_config != req.host_config {
         return Err("local input source/host binding mismatch".into());
     }
-    let _read_scope = chrono_harness::retained_artifacts::retention::read_scope(&req.host_root)?;
-    let retention =
-        chrono_harness::retained_artifacts::retention::Inventory::adopted(&req.host_root)?;
+    let _read_scope = crate::retention::read_scope(&req.host_root)?;
+    let retention = crate::retention::Inventory::adopted(&req.host_root)?;
     let consumer = retention
         .as_ref()
         .map(|_| {
-            chrono_harness::retained_artifacts::retention::unique_path(
-                &req.host_root,
-                "local-inputs-",
-                "",
-            )
-            .map(|path| path.file_name().unwrap().to_str().unwrap().to_string())
+            crate::retention::unique_path(&req.host_root, "local-inputs-", "")
+                .map(|path| path.file_name().unwrap().to_str().unwrap().to_string())
         })
         .transpose()?;
     let report = start::with_report_for_consumer(
@@ -221,7 +217,7 @@ fn produce(
                     return Err("HEAD advanced during local preparation".into());
                 }
                 start::cleanliness_at(r, root, &candidate, registrations.config())?;
-                req.validate()?;
+                req.validate(&r.config)?;
                 report["registry_digest"] = json!(digest);
                 report["base"] = Value::Null;
                 report["candidate"] = json!(candidate);
@@ -266,8 +262,8 @@ fn produce(
             );
             let scope = match &req.selection {
                 Selection::All => None,
-                Selection::Unit { unit } => Some(units::Scope::Unit { unit: unit.clone() }),
-                Selection::Collect => Some(units::Scope::Collect {
+                Selection::Unit { unit } => Some(Scope::Unit { unit: unit.clone() }),
+                Selection::Collect => Some(Scope::Collect {
                     manifest: r
                         .config
                         .check_inputs
@@ -308,7 +304,7 @@ fn produce(
                 let birth_path = origin["birth_report"]
                     .as_str()
                     .ok_or("origin birth report reference missing")?;
-                units::artifact_path(birth_path)?;
+                artifact_path(birth_path)?;
                 let birth_bytes =
                     fs::read(no_symlink_parents(root, birth_path)?).map_err(|e| e.to_string())?;
                 if origin["birth_sha256"] != sha256(&birth_bytes) {
@@ -337,7 +333,7 @@ fn produce(
                 let observed = OffsetDateTime::now_utc();
                 let mut ctx = json!({"schema_version":2,"base":base,"candidate":candidate,"dev_tip":base,"branch_ref":branch,"fork_point":fork,"branch_started_at":birth["branch_started_at"],"observed_at":observed.format(&Rfc3339).map_err(|e|e.to_string())?,"operation":"validate.delta","run_kind":origin["run_kind"],"integration_evidence":origin["integration_evidence"]});
                 if let Some(retained) = origin["retained_inputs"].as_str() {
-                    units::artifact_path(retained)?;
+                    artifact_path(retained)?;
                     file_identity(&no_symlink_parents(root, retained)?)?;
                     ctx["retained_inputs"] = json!(retained);
                 }
@@ -363,8 +359,9 @@ fn produce(
                                     r.config.output_limit_bytes,
                                     &r.environment,
                                     |command, input| {
+                                        let _custody = crate::retention::forward_scope()?;
                                         let result =
-                                            chrono_harness::run_process(root, command, input)?;
+                                            crate::process::run_process(root, command, input)?;
                                         Ok((
                                             result.exit_code,
                                             result.stdout_bytes,
@@ -402,7 +399,7 @@ fn produce(
                 return Err("HEAD advanced during local preparation".into());
             }
             start::cleanliness_at(r, root, &candidate, registrations.config())?;
-            req.validate()?;
+            req.validate(&r.config)?;
             report["registry_digest"] = json!(digest);
             report["base"] = json!(base);
             report["candidate"] = json!(candidate);

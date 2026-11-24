@@ -1,7 +1,7 @@
 //! Observed filesystem identities for an explicitly selected recovery scope.
 use crate::document as wire;
+use crate::document::file_identity;
 use crate::document::sha256;
-use chrono_harness::file_identity;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json as value};
 use std::{

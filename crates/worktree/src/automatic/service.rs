@@ -245,7 +245,7 @@ pub fn validate_activation_sequence<S, T, Q, E, A, M, U, B, D>(source: S,
 #[cfg(not(verus_keep_ghost))]
 use super::*;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::maintenance_signal::{self as signal, Policy as ServicePolicy, RoundGuard};
+use crate::maintenance_signal::{self as signal, Policy as ServicePolicy, RoundGuard};
 #[cfg(unix)]
 #[cfg(not(verus_keep_ghost))]
 use std::os::{
@@ -392,10 +392,7 @@ fn linked_retention_status(
     }
     // Opening Inventory can create its namespace. Only inspect adoption here;
     // absent policies need no attachment probes, and foreign roots get no writes.
-    let policy = no_symlink_parents(
-        path,
-        chrono_harness::retained_artifacts::retention::POLICY_PATH,
-    )?;
+    let policy = no_symlink_parents(path, crate::retention::POLICY_PATH)?;
     match fs::symlink_metadata(policy) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok("not-adopted"),
         Err(error) => return Err(error.to_string()),
@@ -442,7 +439,7 @@ fn maintain_logs(
             .diagnostics_program
             .as_deref()
             .unwrap_or("chrono-diagnostics");
-        let executable = chrono_harness::resolve_program(
+        let executable = crate::process::resolve_program(
             coordinator,
             selected,
             r.environment.get("PATH").map(String::as_str),
@@ -456,7 +453,8 @@ fn maintain_logs(
             r.config.output_limit_bytes,
             &r.environment,
             |command| {
-                let p = chrono_harness::run_process(coordinator, command, &[])?;
+                let _custody = crate::retention::forward_scope()?;
+                let p = crate::process::run_process(coordinator, command, &[])?;
                 Ok((p.exit_code, p.stdout_bytes, p.stderr_bytes))
             },
         )
@@ -495,18 +493,19 @@ fn maintain_retention_inventory(
         Err(error) => return Err(error.to_string()),
     }
     let root = absolute(root, false)?;
-    let Some(owner) = chrono_harness::retained_artifacts::retention::Inventory::adopted(&root)?
-    else {
-        inventory.retention(
-            &root,
-            value!({"kind":"source-result","status":"not-adopted"}),
-        );
-        return Ok(None);
-    };
-    let result = owner.maintain_explicit_observed(|row| {
-        inventory.retention(&root, row.clone());
-        Ok(())
-    })?;
+    match fs::symlink_metadata(root.join(".chrono-harness/retention.json")) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            inventory.retention(
+                &root,
+                value!({"kind":"source-result","status":"not-adopted"}),
+            );
+            return Ok(None);
+        }
+        Err(error) => return Err(error.to_string()),
+        Ok(_) => {}
+    }
+    let result = crate::retention_session::Session::open(&root)?
+        .observe_maintenance(|row| inventory.retention(&root, row))?;
     // Individual observations are already complete above. Keep source accounting
     // and quota errors without duplicating the compact samples in the parent.
     let mut summary = result.clone();
@@ -791,6 +790,13 @@ fn run_round(
     }
     report["linked_output_retention"] = value!(linked_retention);
     report["runtime_logs"] = value!(runtime_logs);
+    if r.config.schema == "chrono-worktree-config/v3" && failures.is_empty() && namespace_complete {
+        match standalone_expiry::expire(r, token, inputs, &observation, report) {
+            Ok(Some(result)) => report["standalone_report_retention"] = result,
+            Ok(None) => (),
+            Err(error) => failures.push(format!("standalone report retention: {error}")),
+        }
+    }
     inventory.worktrees(&observation, r, report, "after");
     if let Err(error) = inventory.finish(report) {
         failures.push(error);

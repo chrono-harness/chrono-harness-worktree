@@ -81,15 +81,17 @@ pub fn select_report_input_scope<S, T, R, E, O, P, C>(
 }
 
 #[cfg(not(verus_keep_ghost))]
+use crate::document::no_symlink_parents;
+#[cfg(not(verus_keep_ghost))]
 use crate::document::sha256;
+#[cfg(not(verus_keep_ghost))]
+use crate::facts;
+#[cfg(not(verus_keep_ghost))]
+use crate::process::{self as observation, CommandSpec, ProcessResult, run_process_observed};
 #[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::{Config, Start};
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::{
-    CommandSpec, ProcessResult, facts, no_symlink_parents, observation, run_process_observed,
-};
 #[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json as value};
 #[cfg(not(verus_keep_ghost))]
@@ -105,11 +107,12 @@ use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 #[cfg(not(verus_keep_ghost))]
 pub(crate) struct Runner {
+    pub(crate) report_guard: Option<crate::ownership::DirectoryLease>,
     registration_root: PathBuf,
     registration_client: Option<Arc<crate::registration::Client>>,
     pub(crate) config: Config,
     pub(crate) birth_lease: Option<crate::ownership::Lease>,
-    pub(crate) coordinator_inputs: Option<chrono_harness::retained_artifacts::retention::ReadScope>,
+    pub(crate) coordinator_inputs: Option<crate::retention::ReadScope>,
     pub(crate) environment: BTreeMap<String, String>,
     tool: observation::Tool,
     processes: Vec<Value>,
@@ -179,8 +182,9 @@ impl Runner {
             timeout_seconds: self.config.timeout_seconds,
             output_limit_bytes: self.config.output_limit_bytes,
         };
+        let _custody = crate::retention::forward_scope()?;
         let result = match input_limit {
-            Some(limit) => chrono_harness::run_process_observed_data(
+            Some(limit) => crate::process::run_process_observed_data(
                 root,
                 &spec,
                 input,
@@ -192,7 +196,7 @@ impl Runner {
         match result {
             Ok(process) => {
                 let mut record = value!({"root":root,"argv":argv});
-                record["process"] = chrono_harness::full::compact_process(&value!(&process))?;
+                record["process"] = process.compact()?;
                 if let Some(limit) = input_limit {
                     record["immutable_input_transport"] = value!({"stdout_limit_bytes":limit,
                         "stderr_limit_bytes":self.config.output_limit_bytes});
@@ -342,14 +346,12 @@ impl Runner {
             self.config.output_limit_bytes,
             |args, input| {
                 let process = self.input(root, args, input)?;
-                let index = self.processes.len() - 1;
-                Ok((index, Self::output(process, args)?))
+                Self::output(process, args)
             },
-            str::to_owned,
         )?;
-        for blob in acquired {
+        for (path, bytes) in acquired {
             self.immutable_blobs
-                .insert((root.to_path_buf(), oid.into(), blob.path), blob.bytes);
+                .insert((root.to_path_buf(), oid.into(), path), bytes);
         }
         Ok(paths
             .iter()
@@ -439,7 +441,7 @@ pub(crate) fn paths(bytes: Vec<u8>) -> Result<BTreeSet<String>, String> {
     }
     let mut paths = BTreeSet::new();
     for path in text.split('\0').filter(|p| !p.is_empty()) {
-        chrono_harness::relative_path(path)?;
+        crate::document::relative_path(path)?;
         if !paths.insert(path.to_string()) {
             return Err("duplicate Git path".into());
         }
@@ -777,31 +779,7 @@ pub(crate) fn with_report_for_consumer<T>(
     if fs::canonicalize(root).map_err(|e| e.to_string())? != root {
         return Err("host root must be canonical".into());
     }
-    let mut inherited = serde_json::Map::new();
-    let mut environment = BTreeMap::new();
-    let mut names = BTreeSet::new();
-    for key in &config.environment.inherit {
-        if key.is_empty() || key.contains(['=', '\0']) || !names.insert(key) {
-            return Err("invalid or duplicate inherited environment name".into());
-        }
-        match std::env::var(key) {
-            Ok(v) => {
-                inherited.insert(key.clone(), value!(v));
-                environment.insert(key.clone(), v);
-            }
-            Err(std::env::VarError::NotPresent) => {
-                inherited.insert(key.clone(), Value::Null);
-            }
-            Err(_) => return Err("non-UTF8 inherited environment value".into()),
-        }
-    }
-    environment.extend(config.environment.values.clone());
-    if environment
-        .iter()
-        .any(|(key, value)| key.is_empty() || key.contains(['=', '\0']) || value.contains('\0'))
-    {
-        return Err("invalid explicit environment entry".into());
-    }
+    let (inherited, environment) = environment(&config)?;
     if [
         "GIT_DIR",
         "GIT_WORK_TREE",
@@ -817,17 +795,18 @@ pub(crate) fn with_report_for_consumer<T>(
         if !config.git.program.contains('/') && !environment.contains_key("PATH") {
             return Err("Git resolution requires declared PATH".into());
         }
-        let path = chrono_harness::resolve_program(
+        let path = crate::process::resolve_program(
             &root,
             &config.git.program,
             Some(environment.get("PATH").map(String::as_str).unwrap_or("")),
         )?;
-        let observed = chrono_harness::file_identity(&path)?.0;
+        let observed = crate::document::file_identity(&path)?.0;
         if config.git.sha256.as_deref() != Some(observed.as_str()) {
             return Err("Git executable digest mismatch before version probe".into());
         }
     }
     // Tool observation retains a failed version process instead of converting it into a success.
+    let _custody = crate::retention::forward_scope()?;
     let tool = observation::tool(
         &root,
         &config.git.program,
@@ -837,7 +816,7 @@ pub(crate) fn with_report_for_consumer<T>(
         config.output_limit_bytes,
     )?;
     let mut tool_record = value!(&tool);
-    tool_record["version"] = chrono_harness::full::compact_process(&tool_record["version"])?;
+    tool_record["version"] = tool.version.compact()?;
     let mut report = value!({"schema":"chrono-worktree-report/v1","operation":operation,"status":"failed","governance":"not-evaluated","parity":"unestablished","source_root":root,"config_path":config_path,"config_sha256":sha256(&bytes),"environment":{"inherited":inherited,"effective":environment},"tool":tool_record,"fetch_ref_removed":false,"recovery":"Failed creation preserves worktrees and branches; inspect recorded identities before recovery."});
     report["agent"] = crate::AgentIdentity::context(&config);
     let version_error = tool.version.failure.clone().or_else(|| {
@@ -865,6 +844,7 @@ pub(crate) fn with_report_for_consumer<T>(
         }
     });
     let mut runner = Runner {
+        report_guard: None,
         registration_root: root.to_path_buf(),
         registration_client: None,
         config,
@@ -891,11 +871,19 @@ pub(crate) fn with_report_for_consumer<T>(
         runner.config.report_directory.trim_end_matches('/'),
     )?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let output_path = chrono_harness::retained_artifacts::retention::unique_path(
-        &dir,
-        &format!("{operation}-"),
-        ".json",
-    )?;
+    // One shared business-directory lease covers this producer and its native descendants.
+    // The singleton performing a maintenance round takes the exclusive lease only during expiry.
+    runner.report_guard = if runner.config.schema == "chrono-worktree-config/v3"
+        && !publication_root
+            .join(crate::retention::POLICY_PATH)
+            .try_exists()
+            .map_err(|e| e.to_string())?
+    {
+        Some(crate::ownership::DirectoryLease::shared(&dir)?)
+    } else {
+        None
+    };
+    let output_path = crate::retention::unique_path(&dir, &format!("{operation}-"), ".json")?;
     let name = output_path
         .file_stem()
         .ok_or("report name")?
@@ -908,7 +896,7 @@ pub(crate) fn with_report_for_consumer<T>(
         .to_str()
         .ok_or("report path UTF8")?
         .to_string();
-    let report_publication = chrono_harness::retained_artifacts::retention::create_adopted(
+    let report_publication = crate::retention::create_adopted(
         &publication_root,
         "lifecycle-original",
         &output_path,
@@ -922,24 +910,9 @@ pub(crate) fn with_report_for_consumer<T>(
         (),
         operation,
         report_publication.as_ref(),
-        |(), publication| {
-            (
-                (),
-                chrono_harness::retained_artifacts::retention::published_output_scope(publication),
-            )
-        },
-        |(), publication| {
-            (
-                (),
-                chrono_harness::retained_artifacts::retention::publication_read_scope(publication),
-            )
-        },
-        |()| {
-            (
-                (),
-                chrono_harness::retained_artifacts::retention::read_scope(root),
-            )
-        },
+        |(), publication| ((), crate::retention::published_output_scope(publication)),
+        |(), publication| ((), crate::retention::publication_read_scope(publication)),
+        |()| ((), crate::retention::read_scope(root)),
     );
     let _read_scope = read_scope?;
     let mut output = fs::OpenOptions::new()
@@ -987,10 +960,7 @@ pub(crate) fn with_report_for_consumer<T>(
     }
     crate::recovery::settle_report(&publication_root, &report)?;
     if matches!(operation, "start" | "reconstruct" | "producer-finish") {
-        chrono_harness::maintenance_signal::announce_adopted(
-            &publication_root,
-            "published-handoff",
-        );
+        crate::maintenance_signal::announce_adopted(&publication_root, "published-handoff");
     }
     Ok(report)
 }
@@ -1002,10 +972,55 @@ pub(crate) fn registrations(
     head: &str,
     config_path: &str,
 ) -> Result<(Registrations, String), String> {
-    let snapshot = facts::registry_snapshot_with_batches(config_path, |paths| {
-        r.registry_blobs(root, head, paths)
-    })?;
-    let digest = crate::document::digest(&value!(snapshot.values))?;
-    let registrations = Registrations::load(r.registration()?, snapshot.values, config_path)?;
+    let resolved = crate::host_config::read(config_path, |path| r.blob(root, head, path))?;
+    let mut values = resolved.values;
+    let mut pending = Vec::new();
+    for role in ["judges", "projects", "filemap", "workflow"] {
+        let path = values[&resolved.selected]["registries"][role]
+            .as_str()
+            .ok_or_else(|| format!("missing {role} registry"))?;
+        crate::document::relative_path(path)?;
+        if !values.contains_key(path) && !pending.iter().any(|p| p == path) {
+            pending.push(path.to_owned());
+        }
+    }
+    for (path, raw) in r.registry_blobs(root, head, &pending)? {
+        values.insert(path, crate::document::json(&raw)?);
+    }
+    let digest = crate::document::digest(&values)?;
+    let registrations =
+        Registrations::load(r.registration()?, values, config_path, &resolved.selected)?;
     Ok((registrations, digest))
+}
+
+#[cfg(not(verus_keep_ghost))]
+pub(crate) fn environment(
+    config: &Config,
+) -> Result<(serde_json::Map<String, Value>, BTreeMap<String, String>), String> {
+    let mut inherited = serde_json::Map::new();
+    let mut environment = BTreeMap::new();
+    let mut names = BTreeSet::new();
+    for key in &config.environment.inherit {
+        if key.is_empty() || key.contains(['=', '\0']) || !names.insert(key) {
+            return Err("invalid or duplicate inherited environment name".into());
+        }
+        match std::env::var(key) {
+            Ok(v) => {
+                inherited.insert(key.clone(), value!(v));
+                environment.insert(key.clone(), v);
+            }
+            Err(std::env::VarError::NotPresent) => {
+                inherited.insert(key.clone(), Value::Null);
+            }
+            Err(_) => return Err("non-UTF8 inherited environment value".into()),
+        }
+    }
+    environment.extend(config.environment.values.clone());
+    if environment
+        .iter()
+        .any(|(key, value)| key.is_empty() || key.contains(['=', '\0']) || value.contains('\0'))
+    {
+        return Err("invalid explicit environment entry".into());
+    }
+    Ok((inherited, environment))
 }

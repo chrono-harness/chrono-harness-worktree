@@ -62,14 +62,16 @@ fn adoption_original(
 }
 
 #[cfg(not(verus_keep_ghost))]
-fn protect_adoption(root: &Path, adoption: &Value) -> Result<Option<Lease>, String> {
+fn protect_adoption(
+    root: &Path,
+    adoption: &Value,
+) -> Result<Option<crate::retention::Guard>, String> {
     let (receipt, original) = adoption_original(root, adoption, None)?;
-    chrono_harness::retained_artifacts::retention::reference_report(
+    crate::retention::reference_report(
         root,
         CURRENT_OWNER_SLOT,
         &receipt.path,
         &crate::recovery::original_paths(root, &original)?,
-        None,
     )
 }
 
@@ -609,7 +611,7 @@ fn owner_binding(path: &Path) -> Result<publication_policy::Binding, String> {
 fn publication_original(
     path: &Path,
     value: &Value,
-    publication: Option<&chrono_harness::retained_artifacts::retention::Publication>,
+    publication: Option<&crate::retention::Publication>,
 ) -> Result<(), String> {
     let mut raw = serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?;
     raw.push(b'\n');
@@ -712,7 +714,7 @@ pub(crate) fn adopted_owner(args: &[String]) -> Result<Value, String> {
     {
         return Ok(Value::Null);
     }
-    use chrono_harness::retained_artifacts::retention;
+    use crate::retention;
     let role = retention::current_report_role(CURRENT_OWNER_SLOT);
     let (_, original) = adoption_original(root, &current, Some(&role))?;
     // Require the complete adoption that deploy-owner wrote, including the unclaimed terminal handoff.
@@ -805,7 +807,7 @@ fn publish_owner(root: &Path, record: &Value) -> Result<Value, String> {
         // publication, but cannot reopen it or repair changed originals.
         return completed_publication(record, &expected, &target, &previous, &intent, &result_path);
     }
-    let publication = chrono_harness::retained_artifacts::retention::Inventory::adopted(root)?
+    let publication = crate::retention::Inventory::adopted(root)?
         .map(|inventory| inventory.resume_unfinished_directory("bootstrap-owner-stage", parent))
         .transpose()?
         .flatten();
@@ -843,11 +845,7 @@ fn publish_owner(root: &Path, record: &Value) -> Result<Value, String> {
         }
         publication_policy::IntentAction::Prepare => {
             // Never adopt a replacement whose preparation has no original intent.
-            chrono_harness::retained_artifacts::retention::copy_adopted(
-                publication.as_ref(),
-                &staged,
-                &next,
-            )?;
+            crate::retention::copy_adopted(publication.as_ref(), &staged, &next)?;
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -1189,11 +1187,7 @@ impl Manager {
         // failed pointer publication cannot shed a previous pending original.
         let _slot = protect_adoption(root, &adoption)?;
         write_json(&index, &adoption, false)?;
-        chrono_harness::retained_artifacts::retention::settle_report(
-            root,
-            CURRENT_OWNER_SLOT,
-            &receipt.path,
-        )?;
+        crate::retention::settle_report(root, CURRENT_OWNER_SLOT, &receipt.path)?;
         stable(r)?;
         report["owner_deployment"] = adoption;
         Ok(())

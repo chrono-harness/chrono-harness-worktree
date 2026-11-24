@@ -18,7 +18,7 @@ pub fn append_action_index(mut indices: Vec<usize>, matches: bool, index: usize)
 #[cfg(not(verus_keep_ghost))]
 use super::*;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::retained_artifacts::retention::{self, Publication};
+use crate::retention::{self, Publication};
 #[cfg(not(verus_keep_ghost))]
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -228,8 +228,7 @@ impl Report {
                 Err(e) => return Err(e.to_string()),
             };
             super::service::observe_boundary("footprint", path);
-            let (footprint, sockets) =
-                chrono_harness::artifact_disposal::observed_artifact_footprint(path)?;
+            let (footprint, sockets) = crate::artifact_disposal::observed_artifact_footprint(path)?;
             Ok::<_, String>((presence, footprint, sockets))
         })();
         let finished = timestamp();
@@ -457,7 +456,7 @@ impl Report {
             return Err(error);
         }
         let physical = self.root.join(&self.path);
-        let (digest, length) = chrono_harness::file_identity(&physical)?;
+        let (digest, length) = crate::document::file_identity(&physical)?;
         parent["complete_inventory"]["receipt"] = value!({"path":self.path,"sha256":digest});
         parent["complete_inventory"]["byte_length"] = value!(length);
         if let Some(publication) = self.publication {

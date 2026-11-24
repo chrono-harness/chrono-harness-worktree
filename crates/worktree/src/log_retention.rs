@@ -1,4 +1,4 @@
-use chrono_harness::CommandSpec;
+use crate::process::CommandSpec;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -38,7 +38,7 @@ pub fn expire(
             String::from_utf8_lossy(&stderr).trim_end()
         ));
     }
-    let result: Option<LogRetention> = chrono_harness::decode(&stdout)?;
+    let result: Option<LogRetention> = crate::document::decode(&stdout)?;
     let partial = result.as_ref().is_some_and(|r| !r.errors.is_empty());
     if (exit == 1) != partial {
         return Err(format!(

@@ -79,11 +79,27 @@ mod document;
 #[cfg(not(verus_keep_ghost))]
 mod evidence_retirement;
 #[cfg(not(verus_keep_ghost))]
+pub mod facts;
+#[cfg(not(verus_keep_ghost))]
+mod host_config;
+#[cfg(not(verus_keep_ghost))]
 pub mod log_retention;
 #[cfg(not(verus_keep_ghost))]
 mod maintenance;
 #[cfg(not(verus_keep_ghost))]
+mod maintenance_signal;
+#[cfg(not(verus_keep_ghost))]
+pub use maintenance_signal::Policy as MaintenancePolicy;
+#[cfg(not(verus_keep_ghost))]
+mod child_io;
+#[cfg(not(verus_keep_ghost))]
 mod ownership;
+#[cfg(not(verus_keep_ghost))]
+mod prepared;
+#[cfg(not(verus_keep_ghost))]
+pub mod process;
+#[cfg(not(verus_keep_ghost))]
+mod process_fds;
 #[cfg(not(verus_keep_ghost))]
 mod rebind;
 #[cfg(not(verus_keep_ghost))]
@@ -103,6 +119,10 @@ mod remote;
 #[cfg(not(verus_keep_ghost))]
 mod removal;
 #[cfg(not(verus_keep_ghost))]
+mod retention;
+#[cfg(not(verus_keep_ghost))]
+mod retention_session;
+#[cfg(not(verus_keep_ghost))]
 mod start;
 #[allow(unexpected_cfgs)]
 #[cfg(not(verus_keep_ghost))]
@@ -114,7 +134,14 @@ pub mod verified_lifecycle;
 #[cfg(not(verus_keep_ghost))]
 pub mod verified_owner_publication;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::{CliOutput, decode, no_symlink_parents, relative_path};
+use crate::document::{decode, no_symlink_parents, relative_path};
+#[cfg(not(verus_keep_ghost))]
+#[derive(Debug, PartialEq, Eq)]
+pub struct CliOutput {
+    pub exit_code: u8,
+    pub stdout: String,
+    pub stderr: String,
+}
 #[cfg(not(verus_keep_ghost))]
 mod fetch_recovery;
 #[cfg(not(verus_keep_ghost))]
@@ -367,14 +394,14 @@ fn configuration(root: &Path, config_path: &str) -> Result<(Config, Vec<u8>), St
         check_inputs::validate(p)?;
     }
     if (config.schema == "chrono-worktree-config/v1"
-        && chrono_harness::json(&bytes)?.get("check_inputs").is_some())
+        && crate::document::json(&bytes)?.get("check_inputs").is_some())
         || (config.schema == "chrono-worktree-config/v2" && config.check_inputs.is_none())
     {
         return Err("worktree v2 requires check_inputs; v1 does not accept it".into());
     }
     if !matches!(
         config.schema.as_str(),
-        "chrono-worktree-config/v1" | "chrono-worktree-config/v2"
+        "chrono-worktree-config/v1" | "chrono-worktree-config/v2" | "chrono-worktree-config/v3"
     ) || config.remote.is_empty()
         || config.remote.starts_with('-')
         || config.remote.contains(['\0', '\n', '\r'])
@@ -439,3 +466,25 @@ pub use automatic::service::run_with_socket as run_maintenance_service_socket;
 #[cfg(all(unix, feature = "producer-birth-test"))]
 #[cfg(not(verus_keep_ghost))]
 pub use automatic::service::validate_activation as validate_maintenance_activation;
+
+#[cfg(not(verus_keep_ghost))]
+pub fn installed_tool(name: &str) -> std::path::PathBuf {
+    use std::path::{Path, PathBuf};
+    let name = Path::new(name);
+    let on_path = std::env::var_os("PATH")
+        .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()));
+    if on_path {
+        name.to_owned()
+    } else {
+        std::env::args_os()
+            .next()
+            .map(PathBuf::from)
+            .and_then(|arg| {
+                arg.parent()
+                    .filter(|dir| !dir.as_os_str().is_empty())
+                    .map(Path::to_owned)
+            })
+            .and_then(|dir| std::path::absolute(dir).ok())
+            .map_or_else(|| name.to_owned(), |dir| dir.join(name))
+    }
+}

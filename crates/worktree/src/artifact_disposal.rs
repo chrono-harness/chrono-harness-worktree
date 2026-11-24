@@ -1,7 +1,8 @@
 //! Explicit directory disposal shared by legacy checkout cleanup and lifecycle cleanup.
+use crate::document::{no_symlink_parents, relative_path};
 use crate::start::Runner;
-use chrono_harness::no_symlink_parents;
 use serde_json::{Value, json};
+use std::os::unix::fs::{FileTypeExt, MetadataExt};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -42,7 +43,7 @@ pub(crate) fn paths(
         .map(|name| {
             if tree
                 .keys()
-                .map(chrono_harness::facts::TreePath::as_str)
+                .map(String::as_str)
                 .chain(index.iter().map(String::as_str))
                 .any(|p| p.starts_with(name) || p == name.trim_end_matches('/'))
             {
@@ -59,7 +60,160 @@ pub(crate) fn paths(
         .collect()
 }
 
-pub use chrono_harness::artifact_disposal::{ArtifactFootprint, artifact_footprint};
+#[derive(Default, serde::Serialize)]
+pub struct ArtifactFootprint {
+    pub file_entries: u64,
+    pub logical_bytes: u64,
+    pub allocated_bytes: Option<u64>,
+}
+
+fn measure(root: &Path, allow_sockets: bool) -> Result<(ArtifactFootprint, u64), String> {
+    let mut pending = vec![root.to_owned()];
+    let mut footprint = ArtifactFootprint::default();
+    let mut blocks = 0u64;
+    let mut sockets = 0u64;
+    while let Some(path) = pending.pop() {
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.to_string()),
+        };
+        blocks = blocks
+            .checked_add(metadata.blocks())
+            .ok_or("artifact allocation overflow")?;
+        let kind = metadata.file_type();
+        if kind.is_dir() {
+            for entry in fs::read_dir(&path).map_err(|error| error.to_string())? {
+                pending.push(entry.map_err(|error| error.to_string())?.path());
+            }
+            continue;
+        }
+        if allow_sockets && kind.is_socket() {
+            sockets = sockets
+                .checked_add(1)
+                .ok_or("artifact socket count overflow")?;
+        } else if !kind.is_file() && !kind.is_symlink() {
+            return Err("artifact contains a special file; preserve it".into());
+        }
+        footprint.file_entries = footprint
+            .file_entries
+            .checked_add(1)
+            .ok_or("artifact count overflow")?;
+        footprint.logical_bytes = footprint
+            .logical_bytes
+            .checked_add(metadata.len())
+            .ok_or("artifact byte count overflow")?;
+    }
+    footprint.allocated_bytes = Some(
+        blocks
+            .checked_mul(512)
+            .ok_or("artifact allocation overflow")?,
+    );
+    Ok((footprint, sockets))
+}
+
+pub fn artifact_footprint(path: &Path) -> Result<ArtifactFootprint, String> {
+    measure(path, false).map(|(footprint, _)| footprint)
+}
+
+pub(crate) fn observed_artifact_footprint(path: &Path) -> Result<(ArtifactFootprint, u64), String> {
+    measure(path, true)
+}
+
+pub(crate) fn identity(path: &Path) -> Result<String, String> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    let kind = metadata.file_type();
+    let label = if kind.is_dir() {
+        "directory"
+    } else if kind.is_file() {
+        "file"
+    } else if kind.is_symlink() {
+        "link"
+    } else {
+        "special"
+    };
+    Ok(format!("{}:{}:{label}", metadata.dev(), metadata.ino()))
+}
+
+pub(crate) fn dispose_entry(
+    root: &Path,
+    relative: &str,
+    expected: &str,
+    mut before_effect: impl FnMut() -> Result<(), String>,
+) -> Result<(), String> {
+    relative_path(relative)?;
+    let relative = Path::new(relative);
+    let parent = relative.parent().ok_or("artifact parent")?;
+    let resolve = || -> Result<PathBuf, String> {
+        let directory = if parent.as_os_str().is_empty() {
+            root.to_owned()
+        } else {
+            no_symlink_parents(root, parent.to_str().ok_or("artifact parent UTF8")?)?
+        };
+        Ok(directory.join(relative.file_name().ok_or("artifact name")?))
+    };
+    let path = resolve()?;
+    let kind = fs::symlink_metadata(&path)
+        .map_err(|error| error.to_string())?
+        .file_type();
+    if !kind.is_file() && !kind.is_dir() && !kind.is_symlink() {
+        return Err("artifact contains a special file; preserve it".into());
+    }
+    before_effect()?;
+    if identity(&resolve()?)? != expected {
+        return Err("artifact identity changed before effect".into());
+    }
+    if kind.is_dir() {
+        fs::remove_dir(path)
+    } else {
+        fs::remove_file(path)
+    }
+    .map_err(|error| error.to_string())
+}
+
+pub(crate) fn publish_entry(source: &Path, destination: &Path) -> Result<(), String> {
+    use rustix::fs::{CWD, RenameFlags, renameat_with};
+    renameat_with(CWD, source, CWD, destination, RenameFlags::NOREPLACE)
+        .map_err(|error| error.to_string())
+}
+
+pub(crate) fn source_safe(r: &mut Runner, root: &Path, relative: &str) -> Result<(), String> {
+    relative_path(relative)?;
+    match fs::symlink_metadata(root.join(".git")) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.to_string()),
+        Ok(_) => (),
+    }
+    // Staged deletions and rename sources no longer appear in ls-files.
+    let tracked = r.literal_inventory(
+        root,
+        &["--literal-pathspecs", "ls-files", "-z", "--", relative],
+    )?;
+    if !tracked.is_empty()
+        || !r
+            .literal_inventory(
+                root,
+                &[
+                    "--literal-pathspecs",
+                    "diff",
+                    "--cached",
+                    "--name-only",
+                    "-z",
+                    "--no-renames",
+                    "--ignore-submodules=none",
+                    "--diff-filter=D",
+                    "--",
+                    relative,
+                ],
+            )?
+            .is_empty()
+    {
+        return Err(format!(
+            "retained output contains committed/index source: {relative}"
+        ));
+    }
+    Ok(())
+}
 
 pub(crate) fn dispose(
     target: &Path,
@@ -111,7 +265,7 @@ pub(crate) fn dispose(
             retention.stable()?;
         }
         // Internal links are unlinked; their external targets are never traversed.
-        if let Err(error) = chrono_harness::artifact_disposal::dispose_directory(path) {
+        if let Err(error) = fs::remove_dir_all(path) {
             let effect = report["artifact_disposals"]
                 .as_array_mut()
                 .unwrap()
