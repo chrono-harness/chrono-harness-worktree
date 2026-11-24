@@ -20,6 +20,8 @@ test = false
 bench = false
 
 [dependencies]
+sha2 = "0.10"
+serde_jcs = "=0.2.0"
 vstd = "=0.0.0-2026-04-20-1748"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "a1cff08f74d996d618372f20adc203d1b5904d50" }

@@ -1,8 +1,8 @@
 //! Explicit per-object producer registrations; no shared mutable catalogue.
 #![allow(unexpected_cfgs)]
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 

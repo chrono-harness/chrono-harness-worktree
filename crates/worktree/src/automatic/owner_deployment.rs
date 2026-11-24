@@ -1,8 +1,8 @@
 //! Selected coordinator bytes change only under original affected enrollment EX leases.
 #![allow(unexpected_cfgs)]
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -1176,7 +1176,7 @@ impl Manager {
         let receipt = self.immutable_reconciled(
             &format!(
                 "owner-adoption-{}.json",
-                chrono_harness::wire::digest(&adoption)?
+                crate::document::digest(&adoption)?
             ),
             &adoption,
         )?;

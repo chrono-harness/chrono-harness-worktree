@@ -1,7 +1,7 @@
 //! Automatic local endpoint/context production; start/reconstruct own branch birth.
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -18,10 +18,14 @@ use crate::{Config, configuration, start};
 #[cfg(not(verus_keep_ghost))]
 pub(crate) mod observation_age;
 #[cfg(not(verus_keep_ghost))]
+use crate::document as wire;
+#[cfg(not(verus_keep_ghost))]
+use crate::document::sha256;
+#[cfg(not(verus_keep_ghost))]
 use chrono_harness::{
     decode, facts, file_identity, no_symlink_parents,
     prepared::{self, Context, InputRequest, PreparedCheck, Selection},
-    sha256, units, wire,
+    units,
 };
 #[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
