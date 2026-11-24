@@ -99,6 +99,8 @@ mod registration;
 #[cfg(not(verus_keep_ghost))]
 mod remote;
 #[cfg(not(verus_keep_ghost))]
+mod removal;
+#[cfg(not(verus_keep_ghost))]
 mod start;
 #[allow(unexpected_cfgs)]
 #[cfg(not(verus_keep_ghost))]

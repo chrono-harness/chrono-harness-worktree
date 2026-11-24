@@ -822,10 +822,7 @@ pub(super) fn drain(
                 .map_err(|e| e.to_string())?
                 .to_str()
                 .ok_or("report overlap path UTF-8")?;
-            let _retention = chrono_harness::retained_artifacts::retention::external_removal_guard(
-                &report_root,
-                report_member,
-            )?;
+            let _retention = crate::removal::Guard::one(&report_root, report_member)?;
             match chrono_harness::artifact_disposal::dispose_entry(
                 &allocation,
                 member,

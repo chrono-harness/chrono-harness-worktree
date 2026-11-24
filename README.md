@@ -33,3 +33,5 @@ workflow 判断原始 UTC 时间与宿主设定的 `max_age_hours`。上下文�
 ## 清理宿主的滚动日志
 
 采用 `.chrono-harness/logging.json` 的宿主须在工作树外安装独立发行的 `chrono-diagnostics`。维护时按主检出的 `diagnostics_program` 或 PATH 选择该命令，同步调用 `expire-logs-v1 ROOT` 核对每次结果。日志策略归该命令解释，部分删除失败进入工作树维护报告；没有日志配置时无需安装该程序。
+
+宿主采用 `.chrono-harness/retention.json` 时，worktree 在删除业务目录前向已安装的 `chrono-harness retained-artifacts-v1` 查询这些路径。保管进程检查仍被消费者占用的原件，并把目录删除租约的文件描述符交给 worktree。回收前会再次核对租约。请在工作树外安装本仓 mise 配置选定的 runner 发行，并将其加入 PATH。
