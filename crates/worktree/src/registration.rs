@@ -22,32 +22,52 @@ pub(crate) struct Registered {
     digest: String,
 }
 
+impl crate::Config {
+    /// Bind the registration query and its declared nested runner search path.
+    pub fn registration_command(
+        &self,
+        root: &Path,
+        host_environment: &BTreeMap<String, String>,
+    ) -> Result<CommandSpec, String> {
+        let path = host_environment.get("PATH");
+        let executable = resolve_program(
+            root,
+            self.registration_program
+                .as_deref()
+                .unwrap_or("chrono-judge-registration"),
+            path.map(String::as_str),
+        )?;
+        let mut env = BTreeMap::new();
+        if let Some(path) = path {
+            env.insert("PATH".into(), path.clone());
+        }
+        Ok(CommandSpec {
+            program: executable
+                .to_str()
+                .ok_or("registration path is not UTF-8")?
+                .into(),
+            args: vec!["worktree-inputs-v1".into()],
+            env,
+            timeout_seconds: self.timeout_seconds,
+            output_limit_bytes: self.output_limit_bytes,
+        })
+    }
+}
+
 impl Client {
-    pub(crate) fn bind(root: &Path, config: &crate::Config) -> Result<Self, String> {
+    pub(crate) fn bind(
+        root: &Path,
+        config: &crate::Config,
+        host_environment: &BTreeMap<String, String>,
+    ) -> Result<Self, String> {
         if config.schema == "chrono-worktree-config/v3" && config.registration_program.is_none() {
             return Ok(Self::Standalone);
         }
-        let executable = resolve_program(
-            root,
-            config
-                .registration_program
-                .as_deref()
-                .unwrap_or("chrono-judge-registration"),
-            None,
-        )?;
+        let command = config.registration_command(root, host_environment)?;
         Ok(Self::Registered(Registered {
             root: root.to_owned(),
-            command: CommandSpec {
-                program: executable
-                    .to_str()
-                    .ok_or("registration path is not UTF-8")?
-                    .into(),
-                args: vec!["worktree-inputs-v1".into()],
-                env: BTreeMap::new(),
-                timeout_seconds: config.timeout_seconds,
-                output_limit_bytes: config.output_limit_bytes,
-            },
-            digest: file_identity(&executable)?.0,
+            digest: file_identity(Path::new(&command.program))?.0,
+            command,
         }))
     }
 
