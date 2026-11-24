@@ -69,7 +69,7 @@ pub(crate) fn resolve_program(
     Err(format!("executable not found: {name}"))
 }
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct ProcessResult {
+pub struct ProcessResult {
     pub(crate) argv: Vec<String>,
     pub(crate) cwd: PathBuf,
     pub(crate) environment: BTreeMap<String, String>,
@@ -283,7 +283,7 @@ pub(crate) fn run_process_observed(
 ) -> Result<ProcessResult, String> {
     observed(root, s, input, Some(digest), s.output_limit_bytes, None)
 }
-pub(crate) fn run_process_observed_data(
+pub fn run_process_observed_data(
     root: &Path,
     s: &CommandSpec,
     input: &[u8],
@@ -341,7 +341,7 @@ pub(crate) fn tool(
 impl ProcessResult {
     /// Both original streams have already been observed. Encode their checked
     /// bytes once using the public retained-process representation.
-    pub(crate) fn compact(&self) -> Result<Value, String> {
+    pub fn compact(&self) -> Result<Value, String> {
         let streams = [
             (
                 "stdout",

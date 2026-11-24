@@ -107,6 +107,7 @@ use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 #[cfg(not(verus_keep_ghost))]
 pub(crate) struct Runner {
+    pub(crate) report_guard: Option<crate::ownership::DirectoryLease>,
     registration_root: PathBuf,
     registration_client: Option<Arc<crate::registration::Client>>,
     pub(crate) config: Config,
@@ -843,6 +844,7 @@ pub(crate) fn with_report_for_consumer<T>(
         }
     });
     let mut runner = Runner {
+        report_guard: None,
         registration_root: root.to_path_buf(),
         registration_client: None,
         config,
@@ -869,6 +871,18 @@ pub(crate) fn with_report_for_consumer<T>(
         runner.config.report_directory.trim_end_matches('/'),
     )?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    // One shared business-directory lease covers this producer and its native descendants.
+    // The singleton performing a maintenance round takes the exclusive lease only during expiry.
+    runner.report_guard = if runner.config.schema == "chrono-worktree-config/v3"
+        && !publication_root
+            .join(crate::retention::POLICY_PATH)
+            .try_exists()
+            .map_err(|e| e.to_string())?
+    {
+        Some(crate::ownership::DirectoryLease::shared(&dir)?)
+    } else {
+        None
+    };
     let output_path = crate::retention::unique_path(&dir, &format!("{operation}-"), ".json")?;
     let name = output_path
         .file_stem()

@@ -5719,3 +5719,6 @@ fn canonical_command(
     );
     Ok(command)
 }
+
+#[cfg(not(verus_keep_ghost))]
+mod standalone_expiry;

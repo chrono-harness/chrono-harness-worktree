@@ -37,3 +37,5 @@ workflow 判断原始 UTC 时间与宿主设定的 `max_age_hours`。上下文�
 采用 `.chrono-harness/logging.json` 的宿主须在工作树外安装独立发行的 `chrono-diagnostics`。维护时按主检出的 `diagnostics_program` 或 PATH 选择该命令，同步调用 `expire-logs-v1 ROOT` 核对每次结果。日志策略归该命令解释，部分删除失败进入工作树维护报告；没有日志配置时无需安装该程序。
 
 宿主采用 `.chrono-harness/retention.json` 时，worktree 在删除业务目录前向已安装的 `chrono-harness retained-artifacts-v1` 查询这些路径。保管进程检查仍被消费者占用的原件，并把目录删除租约的文件描述符交给 worktree。回收前会再次核对租约。请在工作树外安装本仓 mise 配置选定的 runner 发行。worktree 从 PATH 查找 runner。使用系统 PATH 的定时服务可从宿主的工作树程序链接旁加载同一套安装中的 runner。
+
+单独选装 worktree 时，v3 主机在已登记的报告业务目录中保存工作树报告和进程原件。运行 `maintain` 时，`terminal_history.keep_seconds` 同时决定单工具报告的保留时间。省略该字段时报告默认保留 24 小时。需要长期使用的报告须在窗口内复制到持久存储。活跃进程持有内核租约，仍由现行登记或保留窗口内报告引用的原件继续保留。到期且最后一个引用结束后，由下一次取得目录租约的成功维护轮次删除。宿主配置定时维护后，这一过程自动运行。已配置通用原件保管的宿主使用其登记的保留策略。

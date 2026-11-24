@@ -790,6 +790,13 @@ fn run_round(
     }
     report["linked_output_retention"] = value!(linked_retention);
     report["runtime_logs"] = value!(runtime_logs);
+    if r.config.schema == "chrono-worktree-config/v3" && failures.is_empty() && namespace_complete {
+        match standalone_expiry::expire(r, token, inputs, &observation, report) {
+            Ok(Some(result)) => report["standalone_report_retention"] = result,
+            Ok(None) => (),
+            Err(error) => failures.push(format!("standalone report retention: {error}")),
+        }
+    }
     inventory.worktrees(&observation, r, report, "after");
     if let Err(error) = inventory.finish(report) {
         failures.push(error);

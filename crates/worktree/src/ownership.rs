@@ -141,6 +141,26 @@ impl Lease {
 pub(crate) struct DirectoryLease(Lease);
 
 impl DirectoryLease {
+    pub(crate) fn shared(path: &Path) -> Result<Self, String> {
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+            .open(path)
+            .map_err(|e| e.to_string())?;
+        file.lock_shared().map_err(|e| e.to_string())?;
+        let id = inode(&file.metadata().map_err(|e| e.to_string())?);
+        let scope = Scope::new(&[file.as_fd()])?;
+        let lease = Self(Lease {
+            file,
+            path: path.into(),
+            id,
+            directory: true,
+            _scope: scope,
+        });
+        lease.stable()?;
+        Ok(lease)
+    }
+
     pub(crate) fn acquire(
         path: &Path,
         exclusive: bool,

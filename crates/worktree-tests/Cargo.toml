@@ -35,3 +35,13 @@ path = "tests/log_retention.rs"
 [[test]]
 name = "git_checkout"
 path = "tests/git_checkout.rs"
+
+[[bin]]
+name = "mock-worktree-child"
+path = "tests/fixtures/process.rs"
+test = false
+bench = false
+
+[[test]]
+name = "process"
+path = "tests/process.rs"

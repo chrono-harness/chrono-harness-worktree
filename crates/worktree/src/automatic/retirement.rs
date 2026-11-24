@@ -20,6 +20,27 @@ pub fn retire_history(disposed: bool, consumers_released: bool,
     }
 }
 
+pub open spec fn original_due(published: int, now: int, keep: int, referenced: bool) -> bool {
+    !referenced && published + keep <= now
+}
+/// Default output time window. This comparison cannot overflow for any u64 timestamp.
+pub fn expired_original(published: u64, now: u64, keep: u64, referenced: bool) -> (due: bool)
+    ensures due == original_due(published as int, now as int, keep as int, referenced),
+{
+    !referenced && published <= now && now - published >= keep
+}
+
+/// The first successful round after the later of expiration and last reference
+/// is eligible. A host-supplied upper bound on the next round bounds the delay.
+pub proof fn first_eligible_round(published: nat, keep: nat, released: nat,
+    horizon: nat, round_delay: nat, maximum_gap: nat)
+    requires horizon == if published+keep>=released {published+keep} else {released},
+        round_delay<=maximum_gap,
+    ensures original_due(published as int,(horizon+round_delay) as int,keep as int,false),
+        horizon+round_delay <= horizon+maximum_gap,
+        horizon+round_delay >= released,
+{}
+
 pub fn retire_cache_history(completed: bool, generation: u64, current_generation: u64,
     consumers_released: bool, confirmed_at: Option<u64>, observed: u64,
     keep_seconds: u64, over_limit: bool) -> (retire: bool)
