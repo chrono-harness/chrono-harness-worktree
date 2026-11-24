@@ -5,6 +5,15 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 verus! {
+/// The frozen enrollment vector has one cursor position per address. Every native
+/// iteration consumes that position (including a locally protected or failed row).
+pub fn next_enrollment(index: usize, count: usize) -> (next: Option<usize>)
+    ensures next == (if index < count { Some((index + 1) as usize) } else { None }),
+        next.is_some() ==> next.unwrap() > index && next.unwrap() <= count,
+{
+    if index < count { Some(index + 1) } else { None }
+}
+
 /// Pending events and due timers take precedence over an idle observation.
 pub fn maintenance_idle_exit(event_pending: bool, timer_due: bool, idle_due: bool) -> (exit: bool)
     ensures exit == (!event_pending && !timer_due && idle_due),
@@ -572,7 +581,10 @@ fn run_round(
         paths.push(root.clone());
         paths.sort();
     }
-    for path in paths {
+    let mut position = 0;
+    while let Some(next) = next_enrollment(position, paths.len()) {
+        let path = &paths[position];
+        position = next;
         // Observe adopted declarations, then DROP enrollment exclusion before footprint IO.
         let snapshot = (|| {
             let mut owner = Manager::open_metadata(
@@ -581,7 +593,7 @@ fn run_round(
                 &inputs.config_path,
                 &inputs.anchor_config_bytes,
                 token,
-                &path,
+                path,
                 false,
                 false,
                 true,
@@ -589,7 +601,7 @@ fn run_round(
             .ok_or("cleanup policy disappeared")?;
             // A verified enrollment is the association; an empty admission or
             // an inventory-only address cannot authorize a foreign store.
-            if &path != root && !owner.ledger.entries.is_empty() {
+            if path != root && !owner.ledger.entries.is_empty() {
                 linked_retention_roots.insert(path.clone());
             }
             owner.restore_absent_policy(r)?;
@@ -613,14 +625,14 @@ fn run_round(
                 &inputs.config_path,
                 &inputs.anchor_config_bytes,
                 token,
-                &path,
+                path,
                 false,
                 false,
                 true,
             )?
             .ok_or("cleanup policy disappeared")?;
             owner.restore_absent_policy(r)?;
-            observe_boundary("disposition", &path);
+            observe_boundary("disposition", path);
             let errors = owner.drain_entries(r, &exclude, report, true)?;
             owner.retire_empty_address(r, report)?;
             Ok::<_, String>(errors)
@@ -638,7 +650,7 @@ fn run_round(
                     &inputs.config_path,
                     &inputs.anchor_config_bytes,
                     token,
-                    &path,
+                    path,
                     false,
                     false,
                     false,

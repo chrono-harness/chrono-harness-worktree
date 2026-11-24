@@ -9,9 +9,9 @@ use vstd::prelude::*;
 #[path = "maintenance.rs"]
 mod maintenance_verification;
 #[cfg(not(verus_keep_ghost))]
-pub use crate::maintenance::retained_reference_ancestor_required;
+pub use crate::maintenance::{removed_checkout, retained_reference_ancestor_required};
 #[cfg(verus_keep_ghost)]
-pub use maintenance_verification::retained_reference_ancestor_required;
+pub use maintenance_verification::{removed_checkout, retained_reference_ancestor_required};
 
 #[cfg(verus_keep_ghost)]
 #[path = "check_inputs.rs"]
@@ -64,7 +64,7 @@ pub use crate::automatic::migration::{
 };
 #[cfg(not(verus_keep_ghost))]
 pub use crate::automatic::service::{
-    maintenance_exclusions, maintenance_idle_exit, maintenance_retention_phase,
+    maintenance_exclusions, maintenance_idle_exit, maintenance_retention_phase, next_enrollment,
     validate_activation_sequence,
 };
 #[cfg(verus_keep_ghost)]
@@ -76,7 +76,7 @@ pub use automatic_verification::migration::{
 };
 #[cfg(verus_keep_ghost)]
 pub use automatic_verification::service::{
-    maintenance_exclusions, maintenance_idle_exit, maintenance_retention_phase,
+    maintenance_exclusions, maintenance_idle_exit, maintenance_retention_phase, next_enrollment,
     validate_activation_sequence,
 };
 
