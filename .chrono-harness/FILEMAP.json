@@ -1,0 +1,1514 @@
+{
+  "schema_version": 2,
+  "status": "proposed",
+  "files": [
+    {
+      "path": ".chrono-harness/.gitignore",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/FILEMAP.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/USAGE.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/ci/check.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/ci/install.sh",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": ".chrono-harness/ci/units.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/config.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/judges.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/pr.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/projects.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/rules.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/template-answers.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/workflow.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".chrono-harness/worktree.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".config/mise/conf.d/chrono-harness.toml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug.yml",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/documentation.yml",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/enhancement.yml",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/question.yml",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/workflows/check.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".gitignore",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "AGENTS.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": [],
+      "symlink": "CLAUDE.md"
+    },
+    {
+      "path": "CLAUDE.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "README.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "check.sh",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree-tests/Cargo.lock",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree-tests/Cargo.toml",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree-tests/tests/adopted_owner.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree-tests/tests/fixtures/process.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree-tests/tests/git_checkout.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree-tests/tests/log_retention.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree-tests/tests/observation_age.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree-tests/tests/process.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/ci/behavior.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/age.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/automatic.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/bounded_cleanup.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/check_inputs.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/complete_inventory.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/creation.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/fixture_body.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/interrupted_cleanup.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/policy_migration.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/support/git_fault.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/temporary.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/proof_support/worktree/unified_maintenance.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/verified_attention.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_attention.rs",
+            "operation": "verify.worktree-attention-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/Cargo.lock",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/Cargo.toml",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/artifact_disposal.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/automatic.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/automatic/age.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/automatic/cache_adoption.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/automatic/inventory.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/automatic/migration.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/automatic/operation_scopes.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/automatic/owner_deployment.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/automatic/producer.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/automatic/producer/body.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/automatic/producer/layout_migration.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/automatic/producer/rolling.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/automatic/retirement.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/automatic/service.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/automatic/standalone_expiry.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/check_inputs.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/check_inputs/observation_age.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/child_io.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/document.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/evidence_retirement.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/facts.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/fetch_recovery.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/host_config.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/lib.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/log_retention.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/main.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/maintenance.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/maintenance_signal.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/ownership.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/prepared.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/process.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/process_fds.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/rebind.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/rebind_inputs.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/rebind_resume.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/rebind_steps.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/reconstruct.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/recovery.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/registration.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/remote.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/removal.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/retention.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/retention_session.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
+      "path": "crates/worktree/src/start.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/verified_attention.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_attention.rs",
+            "operation": "verify.worktree-attention"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_attention.rs",
+            "operation": "verify.worktree-attention-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/verified_lifecycle.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree/src/verified_owner_publication.rs",
+      "owner": "worktree",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_owner_publication.rs",
+            "operation": "verify.owner-publication"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "docs/licenses/methodology-attribution.md",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "docs/licenses/trureturing-Apache-2.0.txt",
+      "owner": "host",
+      "surface": "documentation",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    }
+  ],
+  "project_edges": [],
+  "cost_models": {
+    "unmeasured": {
+      "cpu_ms": null,
+      "wall_ms": null,
+      "peak_rss_bytes": null,
+      "io_bytes": null,
+      "basis": "unknown"
+    }
+  },
+  "test_costs": [
+    {
+      "test": "worktree-tests",
+      "cost": "unmeasured"
+    }
+  ],
+  "execution_plans": {
+    "test:worktree-tests": {
+      "operations": [
+        "verify.owner-publication",
+        "verify.worktree-lifecycle",
+        "verify.worktree-attention",
+        "verify.owner-publication-tests",
+        "verify.worktree-lifecycle-tests",
+        "verify.worktree-attention-tests",
+        "worktree.owner-check"
+      ],
+      "timeout_seconds": 600,
+      "output_limit_bytes": 2097152
+    }
+  }
+}

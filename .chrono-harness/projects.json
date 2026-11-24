@@ -1,0 +1,174 @@
+{
+  "schema_version": 2,
+  "status": "active",
+  "owners": [
+    "host",
+    "worktree",
+    "worktree-tests"
+  ],
+  "projects": [
+    {
+      "id": "worktree",
+      "kind": "production",
+      "manifest": "crates/worktree/Cargo.toml",
+      "lockfile": "crates/worktree/Cargo.lock",
+      "root": "crates/worktree",
+      "test_project": "worktree-tests",
+      "actions": {
+        "verify_owner_publication": {
+          "operation": "verify.owner-publication",
+          "tool": "verus",
+          "argv": [
+            "--crate-type=lib",
+            "--no-cheating",
+            "--no-external-by-default",
+            "--num-threads",
+            "2",
+            "--output-json",
+            "--compile",
+            "--emit=link=.chrono-harness/state/verify.owner-publication.rlib,dep-info=.chrono-harness/state/verify.owner-publication.rlib.d",
+            "crates/worktree/src/verified_owner_publication.rs",
+            "-o",
+            ".chrono-harness/state/verify.owner-publication.rlib",
+            "-Zchecksum-hash-algorithm=sha256"
+          ],
+          "output_contract": {
+            "version": "0.2026.04.24.f8e1704",
+            "commit": "f8e17045c4ac17a02e566b8997070f2eecc255be"
+          }
+        },
+        "verify_lifecycle": {
+          "operation": "verify.worktree-lifecycle",
+          "tool": "verus",
+          "argv": [
+            "--crate-type=lib",
+            "--no-cheating",
+            "--no-external-by-default",
+            "--num-threads",
+            "2",
+            "--output-json",
+            "--compile",
+            "--emit=link=.chrono-harness/state/verify.worktree-lifecycle.rlib,dep-info=.chrono-harness/state/verify.worktree-lifecycle.rlib.d",
+            "crates/worktree/src/verified_lifecycle.rs",
+            "-o",
+            ".chrono-harness/state/verify.worktree-lifecycle.rlib",
+            "-Zchecksum-hash-algorithm=sha256"
+          ],
+          "output_contract": {
+            "version": "0.2026.04.24.f8e1704",
+            "commit": "f8e17045c4ac17a02e566b8997070f2eecc255be"
+          }
+        },
+        "verify_attention": {
+          "operation": "verify.worktree-attention",
+          "tool": "verus",
+          "argv": [
+            "--crate-type=lib",
+            "--no-cheating",
+            "--no-external-by-default",
+            "--num-threads",
+            "2",
+            "--output-json",
+            "--compile",
+            "--emit=link=.chrono-harness/state/verify.worktree-attention.rlib,dep-info=.chrono-harness/state/verify.worktree-attention.rlib.d",
+            "crates/worktree/src/verified_attention.rs",
+            "-o",
+            ".chrono-harness/state/verify.worktree-attention.rlib",
+            "-Zchecksum-hash-algorithm=sha256"
+          ],
+          "output_contract": {
+            "version": "0.2026.04.24.f8e1704",
+            "commit": "f8e17045c4ac17a02e566b8997070f2eecc255be"
+          }
+        }
+      },
+      "language": "rust"
+    },
+    {
+      "id": "worktree-tests",
+      "kind": "test",
+      "manifest": "crates/worktree-tests/Cargo.toml",
+      "lockfile": "crates/worktree-tests/Cargo.lock",
+      "root": "crates/worktree-tests",
+      "tests_for": "worktree",
+      "actions": {
+        "verify_owner_publication": {
+          "operation": "verify.owner-publication-tests",
+          "tool": "verus",
+          "argv": [
+            "--crate-type=lib",
+            "--no-cheating",
+            "--no-external-by-default",
+            "--num-threads",
+            "2",
+            "--output-json",
+            "--compile",
+            "--emit=link=.chrono-harness/state/verify.owner-publication-tests.rlib,dep-info=.chrono-harness/state/verify.owner-publication-tests.rlib.d",
+            "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "-o",
+            ".chrono-harness/state/verify.owner-publication-tests.rlib",
+            "-Zchecksum-hash-algorithm=sha256"
+          ],
+          "output_contract": {
+            "version": "0.2026.04.24.f8e1704",
+            "commit": "f8e17045c4ac17a02e566b8997070f2eecc255be"
+          }
+        },
+        "verify_lifecycle": {
+          "operation": "verify.worktree-lifecycle-tests",
+          "tool": "verus",
+          "argv": [
+            "--crate-type=lib",
+            "--no-cheating",
+            "--no-external-by-default",
+            "--num-threads",
+            "2",
+            "--output-json",
+            "--compile",
+            "--emit=link=.chrono-harness/state/verify.worktree-lifecycle-tests.rlib,dep-info=.chrono-harness/state/verify.worktree-lifecycle-tests.rlib.d",
+            "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "-o",
+            ".chrono-harness/state/verify.worktree-lifecycle-tests.rlib",
+            "-Zchecksum-hash-algorithm=sha256"
+          ],
+          "output_contract": {
+            "version": "0.2026.04.24.f8e1704",
+            "commit": "f8e17045c4ac17a02e566b8997070f2eecc255be"
+          }
+        },
+        "verify_attention": {
+          "operation": "verify.worktree-attention-tests",
+          "tool": "verus",
+          "argv": [
+            "--crate-type=lib",
+            "--no-cheating",
+            "--no-external-by-default",
+            "--num-threads",
+            "2",
+            "--output-json",
+            "--compile",
+            "--emit=link=.chrono-harness/state/verify.worktree-attention-tests.rlib,dep-info=.chrono-harness/state/verify.worktree-attention-tests.rlib.d",
+            "crates/worktree-tests/tests/verified_attention.rs",
+            "-o",
+            ".chrono-harness/state/verify.worktree-attention-tests.rlib",
+            "-Zchecksum-hash-algorithm=sha256"
+          ],
+          "output_contract": {
+            "version": "0.2026.04.24.f8e1704",
+            "commit": "f8e17045c4ac17a02e566b8997070f2eecc255be"
+          }
+        },
+        "execute": {
+          "operation": "worktree.owner-check",
+          "tool": "bash",
+          "argv": [
+            "./check.sh",
+            "--native"
+          ]
+        }
+      },
+      "language": "rust"
+    }
+  ],
+  "scripts": []
+}

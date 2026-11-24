@@ -1,0 +1,78 @@
+{
+  "schema": "chrono-github-units/v1",
+  "collection": {
+    "schema": "chrono-github-ci/v4",
+    "workflow_path": ".github/workflows/check.yml",
+    "name": "check",
+    "runs_on": "macos-15",
+    "push_branches": [
+      "dev",
+      "main"
+    ],
+    "pull_request_branches": [
+      "dev",
+      "main"
+    ],
+    "branch_creation_base_ref": "refs/heads/dev",
+    "checkout_action": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    "upload_artifact_action": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    "timeout_minutes": 45,
+    "bootstrap": [
+      "/bin/sh",
+      ".chrono-harness/ci/install.sh"
+    ],
+    "runner": ".chrono-harness/bin/chrono-harness",
+    "generator": ".chrono-harness/bin/chrono-ci",
+    "check_config": ".chrono-harness/ci/check.json",
+    "context_path": ".chrono-harness/state/collection/event.json",
+    "artifact_directory": ".chrono-harness/state/collection/",
+    "facts_config": ".chrono-harness/config.json"
+  },
+  "units": {
+    "worktree": {
+      "name": "Worktree / proofs and consumers",
+      "runs_on": "macos-15",
+      "timeout_minutes": 45,
+      "bootstrap": [
+        "/bin/sh",
+        ".chrono-harness/ci/install.sh"
+      ],
+      "context_path": ".chrono-harness/state/worktree/event.json",
+      "artifact_directory": ".chrono-harness/state/worktree/"
+    }
+  },
+  "gather": {
+    "program": "gh",
+    "inherit_environment": [
+      "PATH",
+      "HOME",
+      "GH_TOKEN"
+    ],
+    "credential_environment": [
+      "GH_TOKEN"
+    ],
+    "environment": {},
+    "timeout_seconds": 60,
+    "output_limit_bytes": 8388608,
+    "manifest_path": ".chrono-harness/state/collection/manifest.json",
+    "download_directory": ".chrono-harness/state/collection/downloads/",
+    "report_path": ".chrono-harness/state/collection/gather.json"
+  },
+  "job_gating": {
+    "schema": "chrono-job-gating/v1",
+    "detector": {
+      "runs_on": "macos-15",
+      "timeout_minutes": 45,
+      "bootstrap": [
+        "/bin/sh",
+        ".chrono-harness/ci/install.sh"
+      ],
+      "sparse_checkout": [
+        ".chrono-harness/",
+        ".github/workflows/check.yml",
+        ".config/mise/conf.d/"
+      ]
+    },
+    "evidence_retention_days": 1
+  }
+}
