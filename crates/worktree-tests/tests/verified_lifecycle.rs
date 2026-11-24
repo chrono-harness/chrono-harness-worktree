@@ -568,6 +568,84 @@ fn cleanup_observations_keep_missing_unknown_and_complete_text_distinct() {
     expect_cleanup_outcome(status_suffix, true, false, Failed);
 }
 
+// A cursor that advances exactly one place cannot skip a fixed enrollment.
+fn visit_fixed_enrollment(position: usize, target: usize, count: usize) -> (steps: usize)
+    requires position <= target < count,
+    ensures steps as int == target as int - position as int + 1,
+    decreases target - position,
+{
+    let next = policy::next_enrollment(position, count).unwrap();
+    if position == target { return 1; }
+    1 + visit_fixed_enrollment(next, target, count)
+}
+
+// The first observation is the round's frozen snapshot. Each next observation
+// is the corresponding row's visit, including the cost of all preceding work.
+proof fn bounded_visits(times: Seq<int>, index: int, per_row: int)
+    requires 0 <= index < times.len(), 0 <= per_row,
+        forall|i: int| 1 <= i <= index ==> 0 <= #[trigger] times[i] - times[i - 1] <= per_row,
+    ensures times[0] <= times[index] <= times[0] + index * per_row,
+    decreases index,
+{
+    if index > 0 {
+        bounded_visits(times, index - 1, per_row);
+        assert(0 <= times[index] - times[index - 1] <= per_row);
+        assert(index * per_row == (index - 1) * per_row + per_row) by(nonlinear_arith);
+    }
+}
+
+// Each completed round reports path absence and conflicting Git registrations.
+// The first eligible, successfully disposed row yields both physical postconditions.
+// Other rounds may preserve the directory for any finite prefix.
+proof fn remains_absent(observations: Seq<(bool, bool)>, first: int, later: int)
+    requires 0 <= first <= later < observations.len(), observations[first] == (true, false),
+        forall|i: int| first < i <= later && observations[i - 1] == (true, false)
+            ==> #[trigger] observations[i] == (true, false),
+    ensures observations[later] == (true, false),
+    decreases later - first,
+{
+    if later > first {
+        remains_absent(observations, first, later - 1);
+        assert(observations[later - 1] == (true, false));
+    }
+}
+
+fn expired_cache_cleanup_bound(ready: u128, wake: u128, visit: u128, finish: u128,
+    interval: u64, per_row: u64, effect: u64, target: usize, count: usize,
+    reuse: u64, delete: u64, Ghost(times): Ghost<Seq<int>>,
+    path_absent: bool, registration_conflict: bool)
+    -> (removed: bool)
+    requires target < count, reuse < delete, ready as int > delete as int * 1_000_000_000,
+        ready <= wake, visit <= finish, wake as int - ready as int <= interval as int,
+        times.len() > target as int + 1, times[0] == wake, times[target as int + 1] == visit,
+        forall|i: int| 1 <= i <= target as int + 1 ==> 0 <= #[trigger] times[i] - times[i - 1] <= per_row,
+        finish as int - visit as int <= effect as int,
+    ensures removed == (path_absent && !registration_conflict),
+        finish as int <= ready as int + interval as int
+            + (target as int + 1) * per_row as int + effect as int,
+{
+    let steps = visit_fixed_enrollment(0, target, count);
+    proof { bounded_visits(times, steps as int, per_row as int); }
+    expired_active_enrollment_is_selected(visit, reuse, delete);
+    policy::removed_checkout(path_absent, registration_conflict)
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn last_enrollment_is_visited_and_expiry_has_a_bounded_round() {
+    let steps = visit_fixed_enrollment(0, 3, 4);
+    expect(steps == 4);
+    expect(policy::removed_checkout(true, false));
+    expect(!policy::removed_checkout(false, false));
+    expect(!policy::removed_checkout(true, true));
+    expect(policy::next_enrollment(4, 4).is_none());
+    let ghost times = seq![3_000_000_010int, 3_000_000_020, 3_000_000_030, 3_000_000_040, 3_000_000_050];
+    assert forall|i:int| 1 <= i <= 4 implies 0 <= #[trigger] times[i] - times[i - 1] <= 10 by {
+        assert(i == 1 || i == 2 || i == 3 || i == 4);
+    }
+    expect(expired_cache_cleanup_bound(3_000_000_001, 3_000_000_010, 3_000_000_050,
+        3_000_000_060, 10, 10, 10, 3, 4, 1, 3, Ghost(times), true, false));
+}
+
 // A maintenance visit observes this still-active enrollment with no pending cache.
 fn expired_active_enrollment_is_selected(elapsed_nanos: u128, reuse: u64, delete: u64)
     requires reuse < delete, elapsed_nanos as int > delete as int * 1_000_000_000,

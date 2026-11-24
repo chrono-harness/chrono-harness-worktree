@@ -6,6 +6,13 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 verus! {
+/// A successful removal needs independent observations from the filesystem and Git.
+pub fn removed_checkout(path_absent: bool, conflicting_registration: bool) -> (absent: bool)
+    ensures absent == (path_absent && !conflicting_registration),
+{
+    path_absent && !conflicting_registration
+}
+
 /// Exact references need no ancestry query. Only terminal recovery accepts advances.
 pub fn retained_reference_ancestor_required(reference_matches: bool, allow_advance: bool)
     -> (out: Result<bool, String>)
@@ -855,10 +862,12 @@ impl Cleanup {
         )
     }
     fn absent(&self, r: &mut Runner, root: &Path) -> Result<(), String> {
-        match fs::symlink_metadata(&self.path) {
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
-            _ => return Err("cleanup destination still exists".into()),
+        let path_absent = matches!(fs::symlink_metadata(&self.path),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound);
+        if !path_absent {
+            return Err("cleanup destination still exists".into());
         }
+        let mut conflicting_registration = false;
         for row in r.inventory(root)? {
             let path = Path::new(
                 row.get("worktree")
@@ -869,10 +878,12 @@ impl Cleanup {
                 || (self.branch != "HEAD"
                     && row.get("branch") == Some(&checkout_reference(&self.branch)))
             {
-                return Err(
-                    "cleanup path or branch remains in use by a registered worktree".into(),
-                );
+                conflicting_registration = true;
+                break;
             }
+        }
+        if !removed_checkout(path_absent, conflicting_registration) {
+            return Err("cleanup path or branch remains in use by a registered worktree".into());
         }
         Ok(())
     }
