@@ -136,6 +136,7 @@ impl Runner {
         let client = Arc::new(crate::registration::Client::bind(
             &self.registration_root,
             &self.config,
+            &self.environment,
         )?);
         self.registration_client = Some(Arc::clone(&client));
         Ok(client)

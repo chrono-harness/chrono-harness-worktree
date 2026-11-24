@@ -99,3 +99,32 @@ fn child_reaping_alone_never_marks_inherited_native_work_joined() {
     assert_eq!(p["owned_work_joined"], true);
     assert_eq!(std::fs::read(marker).unwrap(), b"finished");
 }
+
+#[test]
+fn registration_receives_only_the_selected_nested_tool_path() {
+    let root = tempfile::tempdir().unwrap();
+    let program = env!("CARGO_BIN_EXE_mock-worktree-child");
+    let config: chrono_worktree::Config = serde_json::from_value(json!({
+        "schema":"chrono-worktree-config/v2", "registration_program":program,
+        "host_config":".chrono-harness/config.json", "remote":"origin",
+        "git":{"program":"git","expected_version":null,"sha256":null},
+        "environment":{"inherit":[],"values":{}}, "timeout_seconds":17,
+        "output_limit_bytes":2048, "report_directory":".chrono-harness/state/"
+    }))
+    .unwrap();
+    for path in [None, Some(""), Some("/first install/bin:/second/bin")] {
+        let mut host_env = BTreeMap::from([("SSH_AUTH_SOCK".into(), "/host/socket".into())]);
+        if let Some(value) = path {
+            host_env.insert("PATH".into(), value.into());
+        }
+        let command = config.registration_command(root.path(), &host_env).unwrap();
+        assert_eq!(command.program, program);
+        assert_eq!(command.args, ["worktree-inputs-v1"]);
+        assert_eq!(
+            (command.timeout_seconds, command.output_limit_bytes),
+            (17, 2048)
+        );
+        assert_eq!(command.env.get("PATH").map(String::as_str), path);
+        assert_eq!(command.env.len(), usize::from(path.is_some()));
+    }
+}
