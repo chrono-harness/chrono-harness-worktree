@@ -1,5 +1,5 @@
 //! Enrollment locks protect a worktree and its in-flight Git descendants.
-use chrono_harness::process_fds::Scope;
+use crate::process_fds::Scope;
 use std::{
     fs::{self, File, Metadata, OpenOptions, TryLockError},
     io,

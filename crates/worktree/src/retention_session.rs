@@ -10,7 +10,7 @@ use std::{
         fd::{AsFd, OwnedFd},
         unix::net::UnixStream,
     },
-    path::{Path, PathBuf},
+    path::Path,
     process::{Child, ChildStdout, Command, Stdio},
 };
 
@@ -31,24 +31,7 @@ impl Drop for Session {
 impl Session {
     pub(crate) fn open(root: &Path) -> Result<Self, String> {
         let (socket, input) = UnixStream::pair().map_err(|e| e.to_string())?;
-        // The installed user timer invokes the host's binary link with a system-only PATH.
-        let name = Path::new("chrono-harness");
-        let on_path = std::env::var_os("PATH")
-            .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()));
-        let program = if on_path {
-            name.to_owned()
-        } else {
-            std::env::args_os()
-                .next()
-                .map(PathBuf::from)
-                .and_then(|arg| {
-                    arg.parent()
-                        .filter(|dir| !dir.as_os_str().is_empty())
-                        .map(Path::to_owned)
-                })
-                .and_then(|dir| std::path::absolute(dir).ok())
-                .map_or_else(|| name.to_owned(), |dir| dir.join(name))
-        };
+        let program = crate::installed_tool("chrono-harness");
         let mut child = Command::new(program)
             .arg("retained-artifacts-v1")
             .current_dir(root)

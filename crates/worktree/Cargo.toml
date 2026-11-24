@@ -23,10 +23,11 @@ bench = false
 rustix = { version = "1", features = ["fs", "net"] }
 sha2 = "0.10"
 sha1 = "0.10"
+miniz_oxide = "0.8"
 serde_jcs = "=0.2.0"
 vstd = "=0.0.0-2026-04-20-1748"
+tracing-tunnel = { version = "=0.1.0", default-features = false, features = ["sender"] }
 tracing = { version = "0.1", default-features = false, features = ["std"] }
-chrono-harness = { git = "https://github.com/chrono-harness/chrono-harness-runner.git", rev = "a1cff08f74d996d618372f20adc203d1b5904d50" }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["raw_value"] }
 tempfile = "3"
@@ -36,6 +37,5 @@ time = { version = "0.3", features = ["formatting"] }
 [profile.dev.package.sha2]
 opt-level = 3
 
-# Match the runner development profile for the shared inventory implementation.
 [profile.dev]
 opt-level = 1

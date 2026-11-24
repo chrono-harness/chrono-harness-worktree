@@ -439,7 +439,7 @@ fn maintain_logs(
             .diagnostics_program
             .as_deref()
             .unwrap_or("chrono-diagnostics");
-        let executable = chrono_harness::resolve_program(
+        let executable = crate::process::resolve_program(
             coordinator,
             selected,
             r.environment.get("PATH").map(String::as_str),
@@ -454,7 +454,7 @@ fn maintain_logs(
             &r.environment,
             |command| {
                 let _custody = crate::retention::forward_scope()?;
-                let p = chrono_harness::run_process(coordinator, command, &[])?;
+                let p = crate::process::run_process(coordinator, command, &[])?;
                 Ok((p.exit_code, p.stdout_bytes, p.stderr_bytes))
             },
         )

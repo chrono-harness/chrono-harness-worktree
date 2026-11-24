@@ -1,6 +1,6 @@
 //! Worktree passes fixed host data to the installed registration command.
 use crate::document::{decode, file_identity};
-use chrono_harness::{CommandSpec, resolve_program, run_process_observed_data};
+use crate::process::{CommandSpec, resolve_program, run_process_observed_data};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{

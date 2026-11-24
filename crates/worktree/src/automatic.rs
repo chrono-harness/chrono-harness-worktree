@@ -435,6 +435,8 @@ use crate::document::{decode, json, no_symlink_parents, relative_path};
 #[cfg(not(verus_keep_ghost))]
 use crate::facts;
 #[cfg(not(verus_keep_ghost))]
+use crate::process::CommandSpec;
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::verified_owner_publication::{PolicyNamespace, policy_namespace_matches};
@@ -445,8 +447,6 @@ use crate::{
     ownership::Lease,
     start::{self, Runner},
 };
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::CommandSpec;
 #[cfg(not(verus_keep_ghost))]
 pub use producer::{RetainedArtifact, TemporaryHost};
 #[cfg(not(verus_keep_ghost))]
@@ -925,7 +925,7 @@ fn write_bytes_staged(
 struct ManagedProcessOriginals {
     root: PathBuf,
     directory: PathBuf,
-    publication: Option<chrono_harness::retained_artifacts::retention::Publication>,
+    publication: Option<crate::retention::Publication>,
 }
 #[cfg(not(verus_keep_ghost))]
 impl ManagedProcessOriginals {
@@ -942,7 +942,7 @@ impl ManagedProcessOriginals {
                 .ok_or("managed report path")?
         );
         let directory = no_symlink_parents(&root, &path)?;
-        let publication = chrono_harness::retained_artifacts::retention::create_adopted(
+        let publication = crate::retention::create_adopted(
             &root,
             "lifecycle-original",
             &directory,
@@ -963,12 +963,12 @@ impl ManagedProcessOriginals {
         target: &Path,
         mut command: CommandSpec,
         report: &mut Value,
-    ) -> Result<chrono_harness::ProcessResult, String> {
+    ) -> Result<crate::process::ProcessResult, String> {
         let directory = self
             .directory
             .to_str()
             .ok_or("managed process directory UTF-8")?;
-        chrono_harness::verified_verifier::bind_compiler_directory(&mut command.args, directory);
+        crate::process::bind_compiler_directory(&mut command.args, directory);
         let digest = crate::document::file_identity(Path::new(&command.program))?.0;
         let intent = value!({"schema":"chrono-worktree-managed-process-intent/v1",
             "cwd":target,"program":command.program,"argv":command.args,
@@ -981,23 +981,23 @@ impl ManagedProcessOriginals {
         self.record("intent.json", &intent)?;
         let paths = ["stdout", "stderr", "launch.json"].map(|name| self.directory.join(name));
         let _custody = crate::retention::forward_scope()?;
-        let process = chrono_harness::prepared::process_identities(
-            chrono_harness::run_process_observed_retained(
-                target,
-                &command,
-                &[],
-                &digest,
-                &chrono_harness::ProcessEvidence {
-                    root: &self.root,
-                    stdout: &paths[0],
-                    stderr: &paths[1],
-                    launch: &paths[2],
-                    publication: self.publication.as_ref(),
-                },
-            )?,
-        );
+        let mut process = crate::process::observed(
+            target,
+            &command,
+            &[],
+            Some(&digest),
+            command.output_limit_bytes,
+            Some(&crate::process::Evidence {
+                root: &self.root,
+                directory: &self.directory,
+                publication: self.publication.as_ref(),
+            }),
+        )?;
+        for value in process.environment.values_mut() {
+            *value = sha256(value.as_bytes());
+        }
         // Preserve the returned result before any fallible validation or handoff.
-        report["managed_process"] = chrono_harness::full::compact_process(&value!(&process))?;
+        report["managed_process"] = process.compact()?;
         report["managed_process"]["environment_representation"] = value!("sha256");
         let mut receipt = value!(&process);
         for field in ["stdout", "stderr", "stdout_bytes", "stderr_bytes"] {
@@ -1009,7 +1009,7 @@ impl ManagedProcessOriginals {
         receipt["stdout_original"] = value!({"path":paths[0].strip_prefix(&self.root).map_err(|e| e.to_string())?,"sha256":process.stdout_sha256,"length":process.stdout_bytes.len()});
         receipt["stderr_original"] = value!({"path":paths[1].strip_prefix(&self.root).map_err(|e| e.to_string())?,"sha256":process.stderr_sha256,"length":process.stderr_bytes.len()});
         self.record("result.json", &receipt)?;
-        chrono_harness::validate_launch_evidence(&paths[2], &process)?;
+        process.validate_launch(&paths[2])?;
         for (path, expected, length) in [
             (
                 &paths[0],
@@ -1038,11 +1038,17 @@ impl ManagedProcessOriginals {
     }
 
     fn record(&self, name: &str, value: &Value) -> Result<(), String> {
-        chrono_harness::retained_artifacts::retention::write_adopted(
-            self.publication.as_ref(),
-            &self.directory.join(name),
-            &serde_json::to_vec(value).map_err(|e| e.to_string())?,
-        )?;
+        let path = self.directory.join(name);
+        let data = serde_json::to_vec(value).map_err(|e| e.to_string())?;
+        if let Some(publication) = &self.publication {
+            publication.write_file(&path, &data)?;
+        } else {
+            let mut output = fs::File::create_new(path).map_err(|e| e.to_string())?;
+            output
+                .write_all(&data)
+                .and_then(|()| output.sync_all())
+                .map_err(|e| e.to_string())?;
+        }
         fs::File::open(&self.directory)
             .and_then(|directory| directory.sync_all())
             .map_err(|e| e.to_string())
@@ -5612,7 +5618,7 @@ fn program_command(
     {
         environment.insert(k.clone(), v.as_str().ok_or("environment value")?.into());
     }
-    let program = chrono_harness::resolve_program(
+    let program = crate::process::resolve_program(
         root,
         program,
         environment.get("PATH").map(String::as_str),
@@ -5628,7 +5634,7 @@ fn program_command(
             .as_u64()
             .ok_or("registered output limit")? as usize,
     };
-    chrono_harness::validate_command(&command)?;
+    crate::process::validate_command(&command)?;
     Ok(command)
 }
 
@@ -5692,13 +5698,6 @@ fn canonical_command(
     selection: &[String],
 ) -> Result<CommandSpec, String> {
     let config = registrations.config();
-    let canonical = chrono_harness::prepared::declaration(config)?;
-    let participation = canonical
-        .participation
-        .ok_or("canonical check has not adopted worktree participation")?;
-    if participation.operation != "worktree.check" || participation.argv != ["check"] {
-        return Err("canonical participation must declare worktree.check with check argv".into());
-    }
     let mut argv = vec!["check".to_owned()];
     argv.extend_from_slice(selection);
     let mut command = program_command(
@@ -5709,6 +5708,11 @@ fn canonical_command(
             .ok_or("canonical runner path")?,
         argv,
     )?;
+    let participation = crate::prepared::participation(root, config, &command)?
+        .ok_or("canonical check has not adopted worktree participation")?;
+    if participation.operation != "worktree.check" || participation.argv != ["check"] {
+        return Err("canonical participation must declare worktree.check with check argv".into());
+    }
     command.env.insert(
         "CHRONO_WORKTREE_CHECK".into(),
         root.to_str().ok_or("check root UTF-8")?.into(),

@@ -1,4 +1,4 @@
-use chrono_harness::CommandSpec;
+use crate::process::CommandSpec;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;

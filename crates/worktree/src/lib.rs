@@ -91,7 +91,15 @@ mod maintenance_signal;
 #[cfg(not(verus_keep_ghost))]
 pub use maintenance_signal::Policy as MaintenancePolicy;
 #[cfg(not(verus_keep_ghost))]
+mod child_io;
+#[cfg(not(verus_keep_ghost))]
 mod ownership;
+#[cfg(not(verus_keep_ghost))]
+mod prepared;
+#[cfg(not(verus_keep_ghost))]
+pub mod process;
+#[cfg(not(verus_keep_ghost))]
+mod process_fds;
 #[cfg(not(verus_keep_ghost))]
 mod rebind;
 #[cfg(not(verus_keep_ghost))]
@@ -128,7 +136,12 @@ pub mod verified_owner_publication;
 #[cfg(not(verus_keep_ghost))]
 use crate::document::{decode, no_symlink_parents, relative_path};
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::CliOutput;
+#[derive(Debug, PartialEq, Eq)]
+pub struct CliOutput {
+    pub exit_code: u8,
+    pub stdout: String,
+    pub stderr: String,
+}
 #[cfg(not(verus_keep_ghost))]
 mod fetch_recovery;
 #[cfg(not(verus_keep_ghost))]
@@ -453,3 +466,25 @@ pub use automatic::service::run_with_socket as run_maintenance_service_socket;
 #[cfg(all(unix, feature = "producer-birth-test"))]
 #[cfg(not(verus_keep_ghost))]
 pub use automatic::service::validate_activation as validate_maintenance_activation;
+
+#[cfg(not(verus_keep_ghost))]
+pub fn installed_tool(name: &str) -> std::path::PathBuf {
+    use std::path::{Path, PathBuf};
+    let name = Path::new(name);
+    let on_path = std::env::var_os("PATH")
+        .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()));
+    if on_path {
+        name.to_owned()
+    } else {
+        std::env::args_os()
+            .next()
+            .map(PathBuf::from)
+            .and_then(|arg| {
+                arg.parent()
+                    .filter(|dir| !dir.as_os_str().is_empty())
+                    .map(Path::to_owned)
+            })
+            .and_then(|dir| std::path::absolute(dir).ok())
+            .map_or_else(|| name.to_owned(), |dir| dir.join(name))
+    }
+}

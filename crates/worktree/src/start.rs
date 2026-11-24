@@ -87,11 +87,11 @@ use crate::document::sha256;
 #[cfg(not(verus_keep_ghost))]
 use crate::facts;
 #[cfg(not(verus_keep_ghost))]
+use crate::process::{self as observation, CommandSpec, ProcessResult, run_process_observed};
+#[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
 use crate::{Config, Start};
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::{CommandSpec, ProcessResult, observation, run_process_observed};
 #[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json as value};
 #[cfg(not(verus_keep_ghost))]
@@ -183,7 +183,7 @@ impl Runner {
         };
         let _custody = crate::retention::forward_scope()?;
         let result = match input_limit {
-            Some(limit) => chrono_harness::run_process_observed_data(
+            Some(limit) => crate::process::run_process_observed_data(
                 root,
                 &spec,
                 input,
@@ -195,7 +195,7 @@ impl Runner {
         match result {
             Ok(process) => {
                 let mut record = value!({"root":root,"argv":argv});
-                record["process"] = chrono_harness::full::compact_process(&value!(&process))?;
+                record["process"] = process.compact()?;
                 if let Some(limit) = input_limit {
                     record["immutable_input_transport"] = value!({"stdout_limit_bytes":limit,
                         "stderr_limit_bytes":self.config.output_limit_bytes});
@@ -778,31 +778,7 @@ pub(crate) fn with_report_for_consumer<T>(
     if fs::canonicalize(root).map_err(|e| e.to_string())? != root {
         return Err("host root must be canonical".into());
     }
-    let mut inherited = serde_json::Map::new();
-    let mut environment = BTreeMap::new();
-    let mut names = BTreeSet::new();
-    for key in &config.environment.inherit {
-        if key.is_empty() || key.contains(['=', '\0']) || !names.insert(key) {
-            return Err("invalid or duplicate inherited environment name".into());
-        }
-        match std::env::var(key) {
-            Ok(v) => {
-                inherited.insert(key.clone(), value!(v));
-                environment.insert(key.clone(), v);
-            }
-            Err(std::env::VarError::NotPresent) => {
-                inherited.insert(key.clone(), Value::Null);
-            }
-            Err(_) => return Err("non-UTF8 inherited environment value".into()),
-        }
-    }
-    environment.extend(config.environment.values.clone());
-    if environment
-        .iter()
-        .any(|(key, value)| key.is_empty() || key.contains(['=', '\0']) || value.contains('\0'))
-    {
-        return Err("invalid explicit environment entry".into());
-    }
+    let (inherited, environment) = environment(&config)?;
     if [
         "GIT_DIR",
         "GIT_WORK_TREE",
@@ -818,7 +794,7 @@ pub(crate) fn with_report_for_consumer<T>(
         if !config.git.program.contains('/') && !environment.contains_key("PATH") {
             return Err("Git resolution requires declared PATH".into());
         }
-        let path = chrono_harness::resolve_program(
+        let path = crate::process::resolve_program(
             &root,
             &config.git.program,
             Some(environment.get("PATH").map(String::as_str).unwrap_or("")),
@@ -839,7 +815,7 @@ pub(crate) fn with_report_for_consumer<T>(
         config.output_limit_bytes,
     )?;
     let mut tool_record = value!(&tool);
-    tool_record["version"] = chrono_harness::full::compact_process(&tool_record["version"])?;
+    tool_record["version"] = tool.version.compact()?;
     let mut report = value!({"schema":"chrono-worktree-report/v1","operation":operation,"status":"failed","governance":"not-evaluated","parity":"unestablished","source_root":root,"config_path":config_path,"config_sha256":sha256(&bytes),"environment":{"inherited":inherited,"effective":environment},"tool":tool_record,"fetch_ref_removed":false,"recovery":"Failed creation preserves worktrees and branches; inspect recorded identities before recovery."});
     report["agent"] = crate::AgentIdentity::context(&config);
     let version_error = tool.version.failure.clone().or_else(|| {
@@ -1001,4 +977,36 @@ pub(crate) fn registrations(
     let registrations =
         Registrations::load(r.registration()?, values, config_path, &resolved.selected)?;
     Ok((registrations, digest))
+}
+
+#[cfg(not(verus_keep_ghost))]
+pub(crate) fn environment(
+    config: &Config,
+) -> Result<(serde_json::Map<String, Value>, BTreeMap<String, String>), String> {
+    let mut inherited = serde_json::Map::new();
+    let mut environment = BTreeMap::new();
+    let mut names = BTreeSet::new();
+    for key in &config.environment.inherit {
+        if key.is_empty() || key.contains(['=', '\0']) || !names.insert(key) {
+            return Err("invalid or duplicate inherited environment name".into());
+        }
+        match std::env::var(key) {
+            Ok(v) => {
+                inherited.insert(key.clone(), value!(v));
+                environment.insert(key.clone(), v);
+            }
+            Err(std::env::VarError::NotPresent) => {
+                inherited.insert(key.clone(), Value::Null);
+            }
+            Err(_) => return Err("non-UTF8 inherited environment value".into()),
+        }
+    }
+    environment.extend(config.environment.values.clone());
+    if environment
+        .iter()
+        .any(|(key, value)| key.is_empty() || key.contains(['=', '\0']) || value.contains('\0'))
+    {
+        return Err("invalid explicit environment entry".into());
+    }
+    Ok((inherited, environment))
 }

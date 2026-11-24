@@ -6,7 +6,7 @@ use std::{cell::RefCell, fs, os::fd::AsFd, path::Path};
 pub(crate) struct Guard {
     session: RefCell<Session>,
     // The subprocess and any deliberately handed-off child share the original open descriptions.
-    _capabilities: chrono_harness::process_fds::Scope,
+    _capabilities: crate::process_fds::Scope,
 }
 
 impl Guard {
@@ -32,7 +32,7 @@ impl Guard {
             return Err("missing removal descriptors".into());
         }
         let borrowed = fds.iter().map(AsFd::as_fd).collect::<Vec<_>>();
-        let capabilities = chrono_harness::process_fds::Scope::new(&borrowed)?;
+        let capabilities = crate::process_fds::Scope::new(&borrowed)?;
         Ok(Some(Self {
             session: RefCell::new(session),
             _capabilities: capabilities,

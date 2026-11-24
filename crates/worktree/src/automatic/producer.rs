@@ -1550,7 +1550,7 @@ impl TemporaryHost {
         // Lease is !Send and already owns a scope in this thread. Forward it
         // once; adding the explicit lease here duplicates that same capability.
         let _custody = crate::retention::forward_scope()?;
-        chrono_harness::process_fds::forward_command(command, &[])
+        crate::process_fds::forward_command(command, &[]).map(drop)
     }
 
     /// Native fixture output is written before join, independently of Drop.

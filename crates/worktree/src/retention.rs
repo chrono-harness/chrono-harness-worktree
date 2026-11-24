@@ -22,7 +22,7 @@ thread_local! {
 
 /// Forward active host-original capabilities whenever worktree starts a native child.
 /// Duplicates share the original file descriptions, including after this process exits.
-pub(crate) fn forward_scope() -> Result<chrono_harness::process_fds::Scope, String> {
+pub(crate) fn forward_scope() -> Result<crate::process_fds::Scope, String> {
     use std::os::fd::AsFd;
     let sessions = SESSIONS.with(|all| {
         all.borrow()
@@ -35,7 +35,7 @@ pub(crate) fn forward_scope() -> Result<chrono_harness::process_fds::Scope, Stri
         files.extend(session.borrow_mut().descriptors()?);
     }
     let borrowed = files.iter().map(AsFd::as_fd).collect::<Vec<_>>();
-    chrono_harness::process_fds::Scope::new(&borrowed)
+    crate::process_fds::Scope::new(&borrowed)
 }
 
 #[derive(Clone)]
@@ -257,8 +257,12 @@ impl Publication {
             json!({"kind":"hard-link","path":self.path,"source":source,"name":self.member(dest)?}),
         )
     }
+
+    pub(crate) fn reserve_file(&self, dest: &Path, length: u64) -> Result<PathBuf, String> {
+        self.owner.publication(json!({"kind":"reserve-write","path":self.path,"name":self.member(dest)?,"length":length}))
+    }
     pub(crate) fn write_file(&self, dest: &Path, bytes: &[u8]) -> Result<(), String> {
-        let admitted: PathBuf = self.owner.publication(json!({"kind":"reserve-write","path":self.path,"name":self.member(dest)?,"length":bytes.len()}))?;
+        let admitted = self.reserve_file(dest, bytes.len() as u64)?;
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
