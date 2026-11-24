@@ -3617,10 +3617,11 @@ impl Manager {
             }
             return Ok(());
         }
-        let inventory = crate::retention::Inventory::adopted(root)?;
-        if let Some(inventory) = inventory
-            && inventory.accepts("lifecycle-original", path)?
-        {
+        let inventory = match crate::retention::Inventory::adopted(root)? {
+            Some(owner) if owner.accepts("lifecycle-original", path)? => Some(owner),
+            _ => None,
+        };
+        if let Some(inventory) = inventory {
             let dependencies = receipt
                 .map(|v| crate::recovery::original_paths(root, v))
                 .transpose()?
