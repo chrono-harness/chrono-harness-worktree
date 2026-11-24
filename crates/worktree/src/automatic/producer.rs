@@ -1377,7 +1377,7 @@ impl RetainedArtifact {
         drop(store);
         if released {
             if let Some(root) = &self.maintenance_root {
-                chrono_harness::maintenance_signal::announce_adopted(root, "producer-release");
+                crate::maintenance_signal::announce_adopted(root, "producer-release");
             }
         }
         Ok(())

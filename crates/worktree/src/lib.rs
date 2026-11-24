@@ -83,6 +83,10 @@ pub mod log_retention;
 #[cfg(not(verus_keep_ghost))]
 mod maintenance;
 #[cfg(not(verus_keep_ghost))]
+mod maintenance_signal;
+#[cfg(not(verus_keep_ghost))]
+pub use maintenance_signal::Policy as MaintenancePolicy;
+#[cfg(not(verus_keep_ghost))]
 mod ownership;
 #[cfg(not(verus_keep_ghost))]
 mod rebind;
@@ -380,7 +384,7 @@ fn configuration(root: &Path, config_path: &str) -> Result<(Config, Vec<u8>), St
     }
     if !matches!(
         config.schema.as_str(),
-        "chrono-worktree-config/v1" | "chrono-worktree-config/v2"
+        "chrono-worktree-config/v1" | "chrono-worktree-config/v2" | "chrono-worktree-config/v3"
     ) || config.remote.is_empty()
         || config.remote.starts_with('-')
         || config.remote.contains(['\0', '\n', '\r'])

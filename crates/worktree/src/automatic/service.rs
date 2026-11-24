@@ -245,7 +245,7 @@ pub fn validate_activation_sequence<S, T, Q, E, A, M, U, B, D>(source: S,
 #[cfg(not(verus_keep_ghost))]
 use super::*;
 #[cfg(not(verus_keep_ghost))]
-use chrono_harness::maintenance_signal::{self as signal, Policy as ServicePolicy, RoundGuard};
+use crate::maintenance_signal::{self as signal, Policy as ServicePolicy, RoundGuard};
 #[cfg(unix)]
 #[cfg(not(verus_keep_ghost))]
 use std::os::{

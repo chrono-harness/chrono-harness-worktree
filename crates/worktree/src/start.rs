@@ -970,10 +970,7 @@ pub(crate) fn with_report_for_consumer<T>(
     }
     crate::recovery::settle_report(&publication_root, &report)?;
     if matches!(operation, "start" | "reconstruct" | "producer-finish") {
-        chrono_harness::maintenance_signal::announce_adopted(
-            &publication_root,
-            "published-handoff",
-        );
+        crate::maintenance_signal::announce_adopted(&publication_root, "published-handoff");
     }
     Ok(report)
 }

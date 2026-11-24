@@ -26,6 +26,8 @@ workflow 判断原始 UTC 时间与宿主设定的 `max_age_hours`。上下文�
 
 工作树读取宿主登记时，通过已安装的 `chrono-judge-registration worktree-inputs-v1` 校验固定 Git 输入。默认从 PATH 解析判官；宿主可以在工作树配置中用 `registration_program` 绑定自己的安装路径。调用方管理 Git 读取和工作树状态，判官从 stdin 接收登记数据并返回选定的配置、FILEMAP 或路径。使用 mise 的宿主分别固定两个命令的发行。
 
+单独选装工作树可以使用 `chrono-worktree-config/v3`，省略 `registration_program`，由工作树读取固定 Git 提交中登记的业务目录、文件路径和分支。配置了判官路径的宿主使用同一工作树操作并交给已安装的判官校验完整登记。v1/v2 的安装选择仍按已有配置解析。原件保管和文件日志分别由宿主的 retention.json 和 logging.json 启用。
+
 ### 查询已采用的工作树程序
 
 `chrono-worktree adopted-owner-v1 ROOT SELECTED [--if-installed [COMMIT]]` 供 bootstrap 核对已部署的生命周期程序。ROOT 是宿主绝对路径，SELECTED 是宿主登记的程序相对路径。查询核对采用收据、发布意图、发布结果以及原程序、暂存程序和选中程序的文件身份。成功时输出 JSON，含构建报告的来源提交、位置、摘要、读取该报告的槽位、暂存记录及选中程序身份。没有采用记录时输出 `null`。加 `--if-installed` 后，当前程序与记录不符也返回 `null`。给定 COMMIT 时只匹配该来源提交。已匹配的记录损坏时退出 2，错误写到 stderr。

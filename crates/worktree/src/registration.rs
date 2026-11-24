@@ -10,7 +10,13 @@ use std::{
 };
 
 #[derive(Clone)]
-pub(crate) struct Client {
+pub(crate) enum Client {
+    Standalone,
+    Registered(Registered),
+}
+
+#[derive(Clone)]
+pub(crate) struct Registered {
     root: PathBuf,
     command: CommandSpec,
     digest: String,
@@ -18,6 +24,9 @@ pub(crate) struct Client {
 
 impl Client {
     pub(crate) fn bind(root: &Path, config: &crate::Config) -> Result<Self, String> {
+        if config.schema == "chrono-worktree-config/v3" && config.registration_program.is_none() {
+            return Ok(Self::Standalone);
+        }
         let executable = resolve_program(
             root,
             config
@@ -26,7 +35,7 @@ impl Client {
                 .unwrap_or("chrono-judge-registration"),
             None,
         )?;
-        Ok(Self {
+        Ok(Self::Registered(Registered {
             root: root.to_owned(),
             command: CommandSpec {
                 program: executable
@@ -39,9 +48,105 @@ impl Client {
                 output_limit_bytes: config.output_limit_bytes,
             },
             digest: file_identity(&executable)?.0,
-        })
+        }))
     }
 
+    fn standalone_artifacts(config: &Value) -> Result<Vec<&str>, String> {
+        let rows = config["artifacts"]
+            .as_array()
+            .ok_or("missing worktree artifact registrations")?;
+        let mut result = Vec::new();
+        for row in rows {
+            let prefix = row["path"].as_str().ok_or("missing artifact path")?;
+            let physical = prefix
+                .strip_suffix('/')
+                .ok_or("worktree artifact must name a directory")?;
+            crate::document::relative_path(physical)?;
+            if row["tracked"] != false
+                || physical
+                    .split('/')
+                    .any(|part| matches!(part, "" | "." | ".." | ".git"))
+            {
+                return Err(format!("invalid worktree artifact directory: {prefix}"));
+            }
+            if result.contains(&prefix) {
+                return Err(format!("duplicate worktree artifact directory: {prefix}"));
+            }
+            result.push(prefix);
+        }
+        Ok(result)
+    }
+
+    pub(crate) fn custody(&self, config: &Value) -> Result<String, String> {
+        let expected = config["registries"]["filemap"]
+            .as_str()
+            .ok_or("worktree custody FILEMAP path missing")?;
+        crate::document::relative_path(expected)?;
+        if let Self::Registered(registered) = self {
+            let result: Value =
+                registered.query(&json!({"operation":"custody-config","config":config}))?;
+            if result["filemap_path"] != expected {
+                return Err("registration custody FILEMAP path differs".into());
+            }
+        } else {
+            Self::standalone_artifacts(config)?;
+        }
+        Ok(expected.to_owned())
+    }
+
+    pub(crate) fn custody_filemap(&self, filemap: &Value) -> Result<(), String> {
+        if let Self::Registered(registered) = self {
+            let result: Value =
+                registered.query(&json!({"operation":"custody-filemap","filemap":filemap}))?;
+            if result["valid"] != true {
+                return Err("registration custody FILEMAP is not valid".into());
+            }
+        } else {
+            Self::file_paths(filemap)?;
+        }
+        Ok(())
+    }
+
+    fn file_paths(filemap: &Value) -> Result<(), String> {
+        for row in filemap["files"]
+            .as_array()
+            .ok_or("missing worktree file registrations")?
+        {
+            crate::document::relative_path(
+                row["path"].as_str().ok_or("worktree registration path")?,
+            )?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn nonartifact_paths(
+        &self,
+        config: &Value,
+        paths: &[String],
+    ) -> Result<Vec<String>, String> {
+        #[derive(Deserialize)]
+        struct Paths {
+            paths: Vec<String>,
+        }
+        let Self::Registered(registered) = self else {
+            let artifacts = Self::standalone_artifacts(config)?;
+            return Ok(paths
+                .iter()
+                .filter(|path| !artifacts.iter().any(|prefix| path.starts_with(prefix)))
+                .cloned()
+                .collect());
+        };
+        let result:Paths=registered.query(&json!({"operation":"nonartifact-paths","config":{"artifacts":config["artifacts"]},"paths":paths}))?;
+        // A response to this batch can only retain actual input paths in order.
+        let mut inputs = paths.iter();
+        if !result.paths.iter().all(|p| inputs.any(|i| i == p)) {
+            return Err("registration returned paths outside the queried batch".into());
+        }
+        Ok(result.paths)
+    }
+}
+
+impl Registered {
     pub(crate) fn query<T: serde::de::DeserializeOwned>(
         &self,
         request: &Value,
@@ -67,24 +172,6 @@ impl Client {
         }
         decode(&r.stdout_bytes)
     }
-
-    pub(crate) fn nonartifact_paths(
-        &self,
-        config: &Value,
-        paths: &[String],
-    ) -> Result<Vec<String>, String> {
-        #[derive(Deserialize)]
-        struct Paths {
-            paths: Vec<String>,
-        }
-        let result:Paths=self.query(&json!({"operation":"nonartifact-paths","config":{"artifacts":config["artifacts"]},"paths":paths}))?;
-        // A response to this batch can only retain actual input paths in order.
-        let mut inputs = paths.iter();
-        if !result.paths.iter().all(|p| inputs.any(|i| i == p)) {
-            return Err("registration returned paths outside the queried batch".into());
-        }
-        Ok(result.paths)
-    }
 }
 
 pub(crate) struct Registrations {
@@ -107,8 +194,31 @@ impl Registrations {
             effective_config: String,
             filemap: Value,
         }
-        let view: Snapshot =
-            client.query(&json!({"operation":"snapshot","entry":entry,"documents":documents}))?;
+        let view = match client.as_ref() {
+            Client::Registered(registered) => registered
+                .query(&json!({"operation":"snapshot","entry":entry,"documents":documents}))?,
+            Client::Standalone => {
+                let selected =
+                    chrono_harness::facts::registry_identity(&documents, entry)?.effective_path;
+                let config = documents
+                    .get(&selected)
+                    .ok_or("missing worktree host configuration")?;
+                let files = config["registries"]["filemap"]
+                    .as_str()
+                    .ok_or("missing worktree filemap")?;
+                let filemap = documents
+                    .get(files)
+                    .ok_or("missing worktree filemap document")?;
+                Client::file_paths(filemap)?;
+                Client::standalone_artifacts(config)?;
+                // This tool consumes file ownership; execution edges belong to the optional judge.
+                // Preserve the exact immutable filemap as the worktree's binding.
+                Snapshot {
+                    effective_config: selected,
+                    filemap: filemap.clone(),
+                }
+            }
+        };
         let config = documents
             .remove(&view.effective_config)
             .ok_or("missing validated lifecycle configuration")?;

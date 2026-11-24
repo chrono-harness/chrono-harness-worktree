@@ -5376,12 +5376,10 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                     manager.ledger.entries[i].uses.push(token.into());
                     manager.save()?;
                     let coordinator = manager.inputs.policy.coordinator_root.clone();
-                    let activation = chrono_harness::maintenance_signal::RequestContext::new(
-                        target,
-                        &coordinator,
-                    )?;
+                    let activation =
+                        crate::maintenance_signal::RequestContext::new(target, &coordinator)?;
                     command.env.insert(
-                        chrono_harness::maintenance_signal::CONTEXT_ENV.into(),
+                        crate::maintenance_signal::CONTEXT_ENV.into(),
                         serde_json::to_string(&activation).map_err(|error| error.to_string())?,
                     );
                     manager.observe_attention(r, report, false)?;
@@ -5493,10 +5491,7 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
             // The original result and its necessary sealing have returned before activation.
             let root = report["lifecycle_coordinator_root"].as_str().unwrap_or("");
             if !root.is_empty() {
-                chrono_harness::maintenance_signal::announce_adopted(
-                    Path::new(root),
-                    "published-handoff",
-                );
+                crate::maintenance_signal::announce_adopted(Path::new(root), "published-handoff");
             }
         }
     }

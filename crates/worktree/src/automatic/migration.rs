@@ -364,20 +364,9 @@ impl Manager {
             r.blob(&target, &head, path)
         })?;
         let client = r.registration()?;
-        let binding: Value =
-            client.query(&value!({"operation":"custody-config","config":target_config}))?;
-        let filemap_path = binding["filemap_path"]
-            .as_str()
-            .ok_or("registration custody FILEMAP path missing")?;
-        if target_config["registries"]["filemap"] != filemap_path {
-            return Err("registration custody FILEMAP path differs".into());
-        }
-        let target_filemap: Value = decode(&r.blob(&target, &head, filemap_path)?)?;
-        let checked: Value =
-            client.query(&value!({"operation":"custody-filemap","filemap":target_filemap}))?;
-        if checked["valid"] != true {
-            return Err("registration refused custody FILEMAP".into());
-        }
+        let filemap_path = client.custody(&target_config)?;
+        let target_filemap: Value = decode(&r.blob(&target, &head, &filemap_path)?)?;
+        client.custody_filemap(&target_filemap)?;
         artifact_disposal::registered(
             &self
                 .inputs
