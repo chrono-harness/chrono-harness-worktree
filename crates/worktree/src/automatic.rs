@@ -478,6 +478,8 @@ struct Policy {
     #[serde(default)]
     retained_producers: Vec<producer::ProducerPolicy>,
     #[serde(default)]
+    operation_scopes: BTreeMap<String, operation_scopes::Scope>,
+    #[serde(default)]
     terminal_history: Option<TerminalHistory>,
     #[serde(default)]
     cache_history: Option<TerminalHistory>,
@@ -5252,6 +5254,18 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                             value!({"report_path":report["report_path"]}),
                         )?;
                     }
+                    let use_operation = match operation.as_str() {
+                        "check" => "validate.delta",
+                        "bootstrap" => "bootstrap.build",
+                        _ => values["--operation"],
+                    };
+                    let _scope = operation_scopes::enter(
+                        &manager.directory,
+                        &manager.inputs.anchor_policy.operation_scopes,
+                        || r.checkout_identity(target),
+                        use_operation,
+                        token,
+                    )?;
                     let selection = if flags.contains("--collect") {
                         vec!["--collect".to_owned()]
                     } else if let Some(unit) = values.get("--unit") {
@@ -5342,13 +5356,6 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                         bootstrap_command(r, target, target_regs, values["--bootstrap-config"])?
                     } else {
                         registered_command(target, target_regs, values["--operation"])?
-                    };
-                    let use_operation = if operation == "check" {
-                        "validate.delta"
-                    } else if operation == "bootstrap" {
-                        "bootstrap.build"
-                    } else {
-                        values["--operation"]
                     };
                     let artifact_producer = manager
                         .inputs
@@ -5720,5 +5727,7 @@ fn canonical_command(
     Ok(command)
 }
 
+#[cfg(not(verus_keep_ghost))]
+pub(crate) mod operation_scopes;
 #[cfg(not(verus_keep_ghost))]
 mod standalone_expiry;

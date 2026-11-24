@@ -69,6 +69,9 @@ pub use automatic::write_inventory_record;
 #[cfg(not(verus_keep_ghost))]
 pub use automatic::inventory::compact_retention_record as compact_inventory_retention_record;
 #[cfg(not(verus_keep_ghost))]
+#[doc(hidden)]
+pub use automatic::operation_scopes::conflicting_paths;
+#[cfg(not(verus_keep_ghost))]
 pub use automatic::{RetainedArtifact, TemporaryHost};
 #[cfg(not(verus_keep_ghost))]
 mod check_inputs;

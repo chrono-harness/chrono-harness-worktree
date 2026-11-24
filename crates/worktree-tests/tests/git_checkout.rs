@@ -139,3 +139,58 @@ fn checkout_protects_unmerged_staged_and_changed_physical_objects() {
             .is_empty()
     );
 }
+
+#[test]
+fn separate_callers_share_reads_and_exclude_an_overlapping_write() {
+    use chrono_worktree::conflicting_paths;
+    use std::path::PathBuf;
+    let names = |s: &[&str]| s.iter().map(PathBuf::from).collect::<Vec<_>>();
+    for (left_r, left_w, right_r, right_w, expected) in [
+        (
+            vec!["/task/src"],
+            vec![],
+            vec!["/task/src/main"],
+            vec![],
+            false,
+        ),
+        (
+            vec!["/task/src"],
+            vec![],
+            vec![],
+            vec!["/task/src/main"],
+            true,
+        ),
+        (
+            vec![],
+            vec!["/task/src"],
+            vec![],
+            vec!["/task/src/main"],
+            true,
+        ),
+        (vec![], vec!["/task/src"], vec![], vec!["/task/src2"], false),
+        (vec![], vec!["/a/x"], vec![], vec!["/b/x"], false),
+        (
+            vec![],
+            vec!["/git/refs/heads/dev"],
+            vec!["/git/refs/heads/dev"],
+            vec![],
+            true,
+        ),
+        (
+            vec!["/git/index"],
+            vec!["/a/x"],
+            vec![],
+            vec!["/git/index"],
+            true,
+        ),
+    ] {
+        let (lr, lw, rr, rw) = (
+            names(&left_r),
+            names(&left_w),
+            names(&right_r),
+            names(&right_w),
+        );
+        assert_eq!(conflicting_paths(&lr, &lw, &rr, &rw), expected);
+        assert_eq!(conflicting_paths(&rr, &rw, &lr, &lw), expected);
+    }
+}

@@ -542,6 +542,10 @@ fn run_round(
     }
     inventory.worktrees(&observation, r, report, "before");
     let mut failures = Vec::new();
+    if let Err(error) = operation_scopes::cleanup(&directory) {
+        inventory.error("operation-scopes", &error);
+        failures.push(error);
+    }
     let mut unprotected = Vec::new();
     let mut linked_retention_roots = BTreeSet::new();
     match retirement::resume_retired_addresses(inputs, &directory, &namespace, r, report) {
