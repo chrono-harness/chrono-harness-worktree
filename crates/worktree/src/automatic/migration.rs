@@ -1,7 +1,7 @@
 //! Explicit policy and checkout adoption preserve original enrollment evidence.
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
@@ -433,7 +433,7 @@ impl Manager {
                 "terminal_handoff":"not-claimed","disposal":"not-performed"});
             let name = format!(
                 "policy-migration-{}.json",
-                chrono_harness::wire::digest(&record)?
+                crate::document::digest(&record)?
             );
             Some(self.immutable_reconciled(&name, &record)?)
         } else {

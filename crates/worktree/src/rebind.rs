@@ -270,9 +270,9 @@ impl Binding {
             return Err("rebind inputs changed since explicit observation".into());
         }
         report["plan_path"] = value!(plan_path);
-        report["plan_sha256"] = value!(chrono_harness::sha256(bytes));
+        report["plan_sha256"] = value!(crate::document::sha256(bytes));
         report["expected_inputs_digest"] =
-            value!(chrono_harness::wire::digest(&value!(observed.expected))?);
+            value!(crate::document::digest(&value!(observed.expected))?);
         recovery::publish_fields(
             root,
             report,

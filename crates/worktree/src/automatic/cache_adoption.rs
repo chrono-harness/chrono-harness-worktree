@@ -155,7 +155,7 @@ impl Manager {
             "disposal":"not-performed", "terminal_handoff":"not-claimed"});
         let name = format!(
             "main-cache-adoption-{}.json",
-            chrono_harness::wire::digest(&record)?
+            crate::document::digest(&record)?
         );
         let receipt = self.immutable_reconciled(&name, &record)?;
         self.check_entry(r, &e, &head, None)?;

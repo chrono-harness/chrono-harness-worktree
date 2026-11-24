@@ -1,8 +1,8 @@
 //! Produce real Git worktrees and observations; governance remains with the judges.
 #![allow(unexpected_cfgs)]
-#[cfg(not(verus_keep_ghost))]
-use chrono_harness::verus;
 use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 verus! {
@@ -74,6 +74,8 @@ pub use automatic::{RetainedArtifact, TemporaryHost};
 mod check_inputs;
 #[cfg(not(verus_keep_ghost))]
 pub use check_inputs::observation_age::check as check_observation_age;
+#[cfg(not(verus_keep_ghost))]
+mod document;
 #[cfg(not(verus_keep_ghost))]
 mod evidence_retirement;
 #[cfg(not(verus_keep_ghost))]
