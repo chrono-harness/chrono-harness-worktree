@@ -44,7 +44,7 @@ chrono-host-bootstrap check-compiler-sources native "$stem" src/verified_owner_p
   src/automatic/owner_deployment.rs src/automatic/age.rs src/automatic/inventory.rs \
   src/automatic/migration.rs src/automatic/service.rs src/automatic/producer.rs \
   src/automatic/producer/rolling.rs src/automatic/retirement.rs src/recovery.rs \
-  src/lib.rs src/verified_attention.rs src/automatic/standalone_expiry.rs ||
+  src/lib.rs src/log_retention.rs src/verified_attention.rs src/automatic/standalone_expiry.rs ||
   coverage_failure "native library differs from required sources"
 
 src=crates/worktree/src

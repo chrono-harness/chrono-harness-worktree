@@ -132,6 +132,27 @@ pub use cli_status_owner::successful_report_status;
 
 verus! {
 
+pub fn log_owner_can_report(exit: i32, stderr_empty: bool) -> (valid: bool)
+    ensures valid <==> (stderr_empty && (exit == 0 || exit == 1)),
+{
+    stderr_empty && (exit == 0 || exit == 1)
+}
+
+pub fn accept_log_report<T>(exit: i32, report: Option<T>, has_errors: bool)
+    -> (result: Result<Option<T>, ()>)
+    ensures
+        result.is_ok() <==> ((!has_errors && exit == 0)
+            || (has_errors && report.is_some() && exit == 1)),
+        result.is_ok() ==> result == Ok(report),
+{
+    if (!has_errors && exit == 0) || (has_errors && report.is_some() && exit == 1) {
+        Ok(report)
+    } else {
+        Err(())
+    }
+}
+
+
 /// 普通消费交接不改变观察、导入、迁移或部署的现有资格边界。
 pub fn ordinary_admission(operation: &str) -> (selected: bool)
     ensures selected <==> (operation@ == "use"@ || operation@ == "check"@
