@@ -14,77 +14,39 @@ pub(crate) fn digest<T: Serialize>(value: &T) -> Result<String, String> {
 
 use serde::{
     Deserialize, Deserializer,
-    de::{DeserializeOwned, Error, MapAccess, SeqAccess, Visitor},
+    de::{DeserializeOwned, Error},
 };
 use serde_json::Value;
 use std::{
-    fmt, fs,
+    fs,
     io::{self, Read, Write},
     os::unix::fs::MetadataExt,
     path::{Component, Path, PathBuf},
 };
 
-struct UniqueValue(Value);
-
-impl<'de> Deserialize<'de> for UniqueValue {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        strict_json_value(d).map(Self)
-    }
-}
-
 pub(crate) fn strict_json_value<'de, D: Deserializer<'de>>(d: D) -> Result<Value, D::Error> {
-    struct Unique;
-    impl<'de> Visitor<'de> for Unique {
-        type Value = Value;
-        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str("JSON with unique object members")
+    let strict = serde_yaml_ng::Value::deserialize(d).map_err(|error| {
+        let message = error.to_string();
+        if let Some((quoted, location)) = message
+            .strip_prefix("duplicate entry with key ")
+            .and_then(|tail| tail.rsplit_once(" at line "))
+            && let Ok(key) = litrs::StringLit::parse(quoted)
+        {
+            return D::Error::custom(format!(
+                "duplicate JSON member {} at line {location}",
+                key.value()
+            ));
         }
-        fn visit_unit<E: Error>(self) -> Result<Value, E> {
-            Ok(Value::Null)
-        }
-        fn visit_bool<E: Error>(self, x: bool) -> Result<Value, E> {
-            Ok(x.into())
-        }
-        fn visit_i64<E: Error>(self, x: i64) -> Result<Value, E> {
-            Ok(x.into())
-        }
-        fn visit_u64<E: Error>(self, x: u64) -> Result<Value, E> {
-            Ok(x.into())
-        }
-        fn visit_f64<E: Error>(self, x: f64) -> Result<Value, E> {
-            Ok(x.into())
-        }
-        fn visit_str<E: Error>(self, x: &str) -> Result<Value, E> {
-            Ok(x.into())
-        }
-        fn visit_string<E: Error>(self, x: String) -> Result<Value, E> {
-            Ok(x.into())
-        }
-        fn visit_seq<A: SeqAccess<'de>>(self, mut a: A) -> Result<Value, A::Error> {
-            let mut values = Vec::new();
-            while let Some(UniqueValue(value)) = a.next_element()? {
-                values.push(value);
-            }
-            Ok(Value::Array(values))
-        }
-        fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Value, A::Error> {
-            let mut values = serde_json::Map::new();
-            while let Some(key) = map.next_key::<String>()? {
-                if values.contains_key(&key) {
-                    return Err(A::Error::custom(format!("duplicate JSON member {key}")));
-                }
-                values.insert(key, map.next_value::<UniqueValue>()?.0);
-            }
-            Ok(Value::Object(values))
-        }
-    }
-    d.deserialize_any(Unique)
+        error
+    })?;
+    serde_json::to_value(strict).map_err(D::Error::custom)
 }
 
 pub(crate) fn json(bytes: &[u8]) -> Result<Value, String> {
-    serde_json::from_slice::<UniqueValue>(bytes)
-        .map(|value| value.0)
-        .map_err(|error| error.to_string())
+    let mut input = serde_json::Deserializer::from_slice(bytes);
+    let value = strict_json_value(&mut input).map_err(|error| error.to_string())?;
+    input.end().map_err(|error| error.to_string())?;
+    Ok(value)
 }
 pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, String> {
     serde_json::from_value(json(bytes)?).map_err(|error| error.to_string())

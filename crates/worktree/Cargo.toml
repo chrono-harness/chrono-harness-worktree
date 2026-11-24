@@ -20,6 +20,8 @@ test = false
 bench = false
 
 [dependencies]
+serde_yaml_ng = "=0.10.0"
+litrs = "=1.0.1"
 rustix = { version = "1", features = ["fs", "net"] }
 sha2 = "0.10"
 sha1 = "0.10"
