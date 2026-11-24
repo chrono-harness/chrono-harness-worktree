@@ -233,7 +233,7 @@ fn expire_locked(
                 | ".json.fetch-intent.json"
                 | ".json.inventory.jsonl"
                 | ".json.process"
-        ) && path != current["report_path"]
+        ) && address != current["report_path"]
             && (entry.file_type().map_err(|e| e.to_string())?.is_file()
                 || (suffix == ".json.process"
                     && entry.file_type().map_err(|e| e.to_string())?.is_dir()))
@@ -326,7 +326,26 @@ fn expire_locked(
         crate::artifact_disposal::source_safe(r, root, state.trim_end_matches('/'))?;
     }
     for (path, record) in expired {
-        crate::artifact_disposal::dispose_entry(root, path, &record.identity, || lease.stable())?;
+        if record.identity.ends_with(":directory") {
+            let physical = no_symlink_parents(root, path)?;
+            crate::artifact_disposal::dispose(
+                root,
+                std::slice::from_ref(path),
+                std::slice::from_ref(&physical),
+                &mut value!({"artifact_disposals":[]}),
+                || {
+                    lease.stable()?;
+                    if crate::artifact_disposal::identity(&physical)? != record.identity {
+                        return Err("managed original directory identity changed".into());
+                    }
+                    Ok(())
+                },
+            )?;
+        } else {
+            crate::artifact_disposal::dispose_entry(root, path, &record.identity, || {
+                lease.stable()
+            })?;
+        }
         removed += 1;
         bytes = bytes
             .checked_add(record.bytes)
