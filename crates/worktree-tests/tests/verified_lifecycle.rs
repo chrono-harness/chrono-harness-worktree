@@ -413,6 +413,40 @@ pub(crate) fn expect(actual: bool)
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn current_main_cache_custody_requires_a_released_matching_declaration() {
+    broadcast use vstd::string::group_string_axioms;
+    proof {
+        reveal_strlit("active"); reveal_strlit("terminal"); reveal_strlit("");
+        reveal_strlit("chrono-main-cache-custody/v1"); reveal_strlit("h"); reveal_strlit("hh");
+        assert("active"@.len() != "terminal"@.len());
+        assert(""@.len() != "chrono-main-cache-custody/v1"@.len());
+        assert("h"@.len() != "hh"@.len());
+    }
+    let schema = "chrono-main-cache-custody/v1";
+    expect(policy::main_cache_target(true, "active", true));
+    expect(!policy::main_cache_target(false, "active", true));
+    expect(!policy::main_cache_target(true, "terminal", true));
+    expect(!policy::main_cache_target(true, "active", false));
+    expect(policy::current_main_custody(schema, true, "h", "h", true, true, 1));
+    expect(!policy::current_main_custody("", true, "h", "h", true, true, 1));
+    expect(!policy::current_main_custody(schema, false, "h", "h", true, true, 1));
+    expect(!policy::current_main_custody(schema, true, "hh", "h", true, true, 1));
+    expect(!policy::current_main_custody(schema, true, "h", "h", false, true, 1));
+    expect(!policy::current_main_custody(schema, true, "h", "h", true, false, 1));
+    expect(!policy::current_main_custody(schema, true, "h", "h", true, true, 0));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn cache_custody_rejects_repeated_or_unregistered_outputs_and_generation_overflow() {
+    expect(policy::custody_paths(3, 3, true));
+    expect(!policy::custody_paths(3, 2, true));
+    expect(!policy::custody_paths(3, 3, false));
+    expect(policy::custody_generation(0).unwrap() == 1);
+    expect(policy::custody_generation(u64::MAX - 1).unwrap() == u64::MAX);
+    expect(policy::custody_generation(u64::MAX).is_none());
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn protected_drain_targets_require_ownership_and_a_cache_only_exception() {
     use policy::DrainTarget::*;
     broadcast use vstd::string::group_string_axioms;

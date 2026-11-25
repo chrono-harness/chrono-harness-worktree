@@ -1,6 +1,55 @@
 //! Current operator custody of exact historical main outputs, not past producer release.
+#[cfg(not(verus_keep_ghost))]
 use super::*;
+#[cfg(not(verus_keep_ghost))]
+use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(verus_keep_ghost)]
+use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
 
+verus! {
+pub fn main_cache_target(cache_only: bool, status: &str, main: bool) -> (admitted: bool)
+    ensures admitted == (cache_only && status@ == "active"@ && main),
+{
+    cache_only && <&str>::exec_eq(status, "active") && main
+}
+
+pub fn custody_declaration(schema: &str, same_path: bool, released: bool, reason_present: bool,
+    artifacts: usize) -> (valid: bool)
+    ensures valid == (schema@ == "chrono-main-cache-custody/v1"@ && same_path && released
+        && reason_present && artifacts > 0),
+{
+    <&str>::exec_eq(schema, "chrono-main-cache-custody/v1") && same_path && released
+        && reason_present && artifacts > 0
+}
+
+/// New custody is bound to today's checkout. Replay checks the recorded historical HEAD separately.
+pub fn current_main_custody(schema: &str, same_path: bool, declared_head: &str, actual_head: &str,
+    released: bool, reason_present: bool, artifacts: usize) -> (valid: bool)
+    ensures valid == (schema@ == "chrono-main-cache-custody/v1"@ && same_path
+        && declared_head@ == actual_head@ && released && reason_present && artifacts > 0),
+{
+    custody_declaration(schema, same_path, released, reason_present, artifacts)
+        && <&str>::exec_eq(declared_head, actual_head)
+}
+
+pub fn custody_paths(requested: usize, distinct: usize, all_declared: bool) -> (valid: bool)
+    ensures valid == (requested == distinct && all_declared),
+{
+    requested == distinct && all_declared
+}
+
+pub fn custody_generation(current: u64) -> (generation: Option<u64>)
+    ensures generation == (if current < u64::MAX { Some((current + 1) as u64) } else { None }),
+{
+    current.checked_add(1)
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Custody {
@@ -12,6 +61,7 @@ struct Custody {
     reason: String,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Manager {
     pub(super) fn cache_release_generation(&self, e: &Entry) -> Result<Option<u64>, String> {
         let Some(request) = e.enrollment.get("cache_release") else {
@@ -53,11 +103,13 @@ impl Manager {
                 || record["historical_producer_outcome"] != "unknown"
                 || record["disposal"] != "not-performed"
                 || record["terminal_handoff"] != "not-claimed"
-                || plan.schema != "chrono-main-cache-custody/v1"
-                || plan.path != e.path
-                || !plan.current_consumers_released
-                || plan.reason.trim().is_empty()
-                || selected.is_empty()
+                || !custody_declaration(
+                    &plan.schema,
+                    plan.path == e.path,
+                    plan.current_consumers_released,
+                    !plan.reason.trim().is_empty(),
+                    plan.artifacts.len(),
+                )
                 || selected.len() != plan.artifacts.len()
                 || selected.iter().any(|p| owned.contains(p))
             {
@@ -95,7 +147,11 @@ impl Manager {
             .current_entry(target)
             .ok_or("current custody requires main enrollment")?;
         let e = self.ledger.entries[i].clone();
-        if !e.cache_only || e.status != "active" || target != self.inputs.policy.coordinator_root {
+        if !main_cache_target(
+            e.cache_only,
+            &e.status,
+            target == self.inputs.policy.coordinator_root,
+        ) {
             return Err(
                 "current cache custody requires the active adopted Git main checkout".into(),
             );
@@ -107,28 +163,26 @@ impl Manager {
         self.check_entry(r, &e, &head, None)?;
         let bytes = crate::recovery::state_bytes(target, plan_path)?;
         let plan: Custody = decode(&bytes)?;
-        if plan.schema != "chrono-main-cache-custody/v1"
-            || plan.path != target
-            || plan.head != head
-            || !plan.current_consumers_released
-            || plan.reason.trim().is_empty()
-            || plan.artifacts.is_empty()
-        {
+        if !current_main_custody(
+            &plan.schema,
+            plan.path == target,
+            &plan.head,
+            &head,
+            plan.current_consumers_released,
+            !plan.reason.trim().is_empty(),
+            plan.artifacts.len(),
+        ) {
             return Err(
                 "current custody must bind exact main HEAD and explicit consumer release".into(),
             );
         }
         let selected: BTreeSet<_> = plan.artifacts.iter().cloned().collect();
-        if selected.len() != plan.artifacts.len()
-            || selected.iter().any(|p| {
-                !self
-                    .inputs
-                    .policy
-                    .artifacts
-                    .iter()
-                    .any(|a| a.path == *p && select_artifact(&a.disposition, true, false))
+        let all_declared = selected.iter().all(|path| {
+            self.inputs.policy.artifacts.iter().any(|artifact| {
+                artifact.path == *path && select_artifact(&artifact.disposition, true, false)
             })
-        {
+        });
+        if !custody_paths(plan.artifacts.len(), selected.len(), all_declared) {
             return Err("current custody selects repeated or undeclared disposable outputs".into());
         }
         artifact_disposal::registered(&plan.artifacts, &[self.inputs.registrations.config()])?;
@@ -171,10 +225,8 @@ impl Manager {
             .ownership
             .as_mut()
             .ok_or("main custody lost kernel ownership")?;
-        owner.generation = owner
-            .generation
-            .checked_add(1)
-            .ok_or("ownership generation overflow")?;
+        owner.generation =
+            custody_generation(owner.generation).ok_or("ownership generation overflow")?;
         owner.cache_pending = true;
         self.check_entry(r, &updated, &head, None)?;
         lease.stable()?;

@@ -206,8 +206,11 @@ pub fn retain_cleanup_attempt(age_retirement: bool, pending: bool, current: bool
 pub(crate) mod age;
 #[cfg(not(verus_keep_ghost))]
 pub(crate) mod age;
+#[cfg(verus_keep_ghost)]
+#[path = "automatic/cache_adoption.rs"]
+pub(crate) mod cache_adoption;
 #[cfg(not(verus_keep_ghost))]
-mod cache_adoption;
+pub(crate) mod cache_adoption;
 #[cfg(verus_keep_ghost)]
 #[path = "automatic/inventory.rs"]
 pub(crate) mod inventory;
