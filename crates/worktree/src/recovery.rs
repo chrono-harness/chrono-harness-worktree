@@ -256,7 +256,7 @@ pub(crate) fn verify_inputs_for_consumer(
 }
 
 #[cfg(not(verus_keep_ghost))]
-fn original_bytes(root: &Path, path: &str) -> Result<Option<Vec<u8>>, String> {
+pub(crate) fn original_bytes(root: &Path, path: &str) -> Result<Option<Vec<u8>>, String> {
     let path = state_path(root, path)?;
     match fs::symlink_metadata(&path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),

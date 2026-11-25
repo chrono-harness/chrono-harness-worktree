@@ -49,13 +49,13 @@ mod automatic_verification;
 pub use crate::automatic::{
     MissingCacheObservation, absence_probe_required, absent_attachment_conflict, admission_handoff,
     known_absent_enrollment, missing_cache_observation, publish_enrollment_record,
-    retain_cleanup_attempt,
+    retain_cleanup_attempt, unfinished_cleanup_publication,
 };
 #[cfg(verus_keep_ghost)]
 pub use automatic_verification::{
     MissingCacheObservation, absence_probe_required, absent_attachment_conflict, admission_handoff,
     known_absent_enrollment, missing_cache_observation, publish_enrollment_record,
-    retain_cleanup_attempt,
+    retain_cleanup_attempt, unfinished_cleanup_publication,
 };
 
 #[cfg(not(verus_keep_ghost))]
