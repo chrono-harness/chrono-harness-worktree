@@ -317,6 +317,12 @@ pub enum AdoptedPolicySource {
     RetainedTarget,
 }
 
+pub fn needs_enrollment_report(cache_only: bool, pending_use: bool, pending_handoff: bool) -> (needed: bool)
+    ensures needed == (!cache_only || pending_use || pending_handoff),
+{
+    !cache_only || pending_use || pending_handoff
+}
+
 pub fn imported_policy_required(kind: &str, migrated: bool) -> (required: bool)
     ensures required <==> (kind@ == "import"@ && !migrated),
 {

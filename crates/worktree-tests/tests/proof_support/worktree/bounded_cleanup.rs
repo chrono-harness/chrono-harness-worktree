@@ -22,6 +22,14 @@ fn terminal_history_keeps_unknown_future_live_and_unexpired_records() {
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn main_enrollment_report_is_released_when_its_last_handoff_ends() {
+    expect(!policy::needs_enrollment_report(true, false, false));
+    expect(policy::needs_enrollment_report(true, true, false));
+    expect(policy::needs_enrollment_report(true, false, true));
+    expect(policy::needs_enrollment_report(false, false, false));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn cache_history_releases_a_settled_main_generation_and_keeps_pending_results() {
     let expired = policy::retire_cache_history(true, 1, 2, false, true, Some(100), 110, 10, false);
     let capacity = policy::retire_cache_history(true, 1, 2, false, true, Some(100), 100, 10, true);
