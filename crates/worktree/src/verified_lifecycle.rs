@@ -68,6 +68,15 @@ pub use automatic_verification::age::{
 };
 
 #[cfg(not(verus_keep_ghost))]
+pub use crate::automatic::cache_adoption::{
+    current_main_custody, custody_declaration, custody_generation, custody_paths, main_cache_target,
+};
+#[cfg(verus_keep_ghost)]
+pub use automatic_verification::cache_adoption::{
+    current_main_custody, custody_declaration, custody_generation, custody_paths, main_cache_target,
+};
+
+#[cfg(not(verus_keep_ghost))]
 pub use crate::automatic::inventory::append_action_index;
 #[cfg(not(verus_keep_ghost))]
 pub use crate::automatic::migration::{
