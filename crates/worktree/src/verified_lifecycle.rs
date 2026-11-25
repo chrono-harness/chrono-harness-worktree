@@ -331,16 +331,16 @@ pub fn binds_use_intent(intent: &ManagedUseBinding, result: &ManagedUseBinding,
     ensures bound <==> (intent.schema@ == "chrono-worktree-managed-use-intent/v2"@
         && result.schema@ == "chrono-worktree-managed-use-result/v1"@
         && !intent.joined && result.joined
-        && intent.checkout@.len() > 0 && intent.checkout@ == result.checkout@
-        && intent.operation@.len() > 0 && intent.operation@ == result.operation@
+        && intent.checkout@ != ""@ && intent.checkout@ == result.checkout@
+        && intent.operation@ != ""@ && intent.operation@ == result.operation@
         && intent.report_path@ == report_path@ && result.report_path@ == report_path@
         && intent.process_path@ == process_path@ && result.process_path@ == process_path@),
 {
     <&str>::exec_eq(intent.schema, "chrono-worktree-managed-use-intent/v2")
         && <&str>::exec_eq(result.schema, "chrono-worktree-managed-use-result/v1")
         && !intent.joined && result.joined
-        && intent.checkout.len() > 0 && <&str>::exec_eq(intent.checkout, result.checkout)
-        && intent.operation.len() > 0 && <&str>::exec_eq(intent.operation, result.operation)
+        && !<&str>::exec_eq(intent.checkout, "") && <&str>::exec_eq(intent.checkout, result.checkout)
+        && !<&str>::exec_eq(intent.operation, "") && <&str>::exec_eq(intent.operation, result.operation)
         && <&str>::exec_eq(intent.report_path, report_path)
         && <&str>::exec_eq(result.report_path, report_path)
         && <&str>::exec_eq(intent.process_path, process_path)
