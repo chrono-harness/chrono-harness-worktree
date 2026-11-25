@@ -4751,14 +4751,34 @@ impl Manager {
                     report,
                 )?;
                 let binding = &evidence.descriptor;
-                if binding["operation"] != "cleanup"
-                    || binding["lock_reason"] != prior.token
-                    || binding["report_path"] != prior.path
-                    || binding["destination"] != value!(e.path)
-                    || binding["branch_ref"] != e.current_branch()
-                    || binding["base"] != t.head
-                    || binding["registry_digest"] != report["registry_digest"]
-                {
+                let text = |key: &str| {
+                    binding[key]
+                        .as_str()
+                        .ok_or("missing interrupted cleanup field")
+                };
+                let original = crate::verified_lifecycle::CleanupBinding {
+                    token: text("lock_reason")?,
+                    report_path: text("report_path")?,
+                    checkout: text("destination")?,
+                    branch: text("branch_ref")?,
+                    head: text("base")?,
+                    registry_digest: text("registry_digest")?,
+                };
+                let expected = crate::verified_lifecycle::CleanupBinding {
+                    token: &prior.token,
+                    report_path: &prior.path,
+                    checkout: e.path.to_str().ok_or("cleanup path is not UTF-8")?,
+                    branch: e.current_branch(),
+                    head: &t.head,
+                    registry_digest: report["registry_digest"]
+                        .as_str()
+                        .ok_or("missing current registry digest")?,
+                };
+                if !crate::verified_lifecycle::binds_interrupted_cleanup(
+                    text("operation")?,
+                    &original,
+                    &expected,
+                ) {
                     return Err(
                         "interrupted cleanup intent differs from its terminal enrollment".into(),
                     );
