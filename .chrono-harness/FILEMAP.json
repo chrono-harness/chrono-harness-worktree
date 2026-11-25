@@ -50,6 +50,13 @@
       "edges": []
     },
     {
+      "path": ".chrono-harness/cleanup.json",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
       "path": ".chrono-harness/config.json",
       "owner": "host",
       "surface": "product",

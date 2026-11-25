@@ -47,6 +47,13 @@
           "GITHUB_REPOSITORY"
         ]
       }
+    },
+    "participation": {
+      "operation": "worktree.check",
+      "tool": "chrono-worktree",
+      "argv": [
+        "check"
+      ]
     }
   },
   "protocol": {
@@ -194,6 +201,48 @@
     },
     {
       "path": "target/",
+      "owner": "host",
+      "kind": "build",
+      "tracked": false
+    },
+    {
+      "path": ".chrono-harness/state/preparation/",
+      "owner": "host",
+      "kind": "check-result",
+      "tracked": false
+    },
+    {
+      "path": ".chrono-harness/state/collection/",
+      "owner": "host",
+      "kind": "check-result",
+      "tracked": false
+    },
+    {
+      "path": ".chrono-harness/state/worktree/",
+      "owner": "host",
+      "kind": "check-result",
+      "tracked": false
+    },
+    {
+      "path": ".chrono-harness/state/worktrees/",
+      "owner": "host",
+      "kind": "worktree-record",
+      "tracked": false
+    },
+    {
+      "path": ".chrono-harness/state/origins/",
+      "owner": "host",
+      "kind": "worktree-record",
+      "tracked": false
+    },
+    {
+      "path": ".chrono-harness/state/local/",
+      "owner": "host",
+      "kind": "worktree-record",
+      "tracked": false
+    },
+    {
+      "path": ".chrono-harness/state/native-check/",
       "owner": "host",
       "kind": "build",
       "tracked": false

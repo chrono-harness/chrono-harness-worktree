@@ -11,8 +11,9 @@ if [[ $# -ne 1 || $1 != --native ]]; then
   echo 'usage: ./check.sh [--native]' >&2
   exit 2
 fi
-mkdir -p target
-scratch=$(mktemp -d "$(pwd -P)/target/check.XXXXXXXX")
+scratch_root=$(pwd -P)/.chrono-harness/state/native-check
+mkdir -p "$scratch_root"
+scratch=$(mktemp -d "$scratch_root/check.XXXXXXXX")
 trap 'rm -rf -- "$scratch"' EXIT
 export TMPDIR="$scratch"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$scratch/cargo}"

@@ -22,7 +22,8 @@
       ".chrono-harness/config.json",
       ".config/mise/conf.d/chrono-harness.toml",
       ".chrono-harness/ci/install.sh",
-      ".github/workflows/check.yml"
+      ".github/workflows/check.yml",
+      ".chrono-harness/cleanup.json"
     ],
     "operation_timeout_seconds": 600,
     "operation_output_limit_bytes": 2097152,

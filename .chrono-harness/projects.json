@@ -26,10 +26,10 @@
             "2",
             "--output-json",
             "--compile",
-            "--emit=link=.chrono-harness/state/verify.owner-publication.rlib,dep-info=.chrono-harness/state/verify.owner-publication.rlib.d",
+            "--emit=link={operation_state}/verify.owner-publication.rlib,dep-info={operation_state}/verify.owner-publication.rlib.d",
             "crates/worktree/src/verified_owner_publication.rs",
             "-o",
-            ".chrono-harness/state/verify.owner-publication.rlib",
+            "{operation_state}/verify.owner-publication.rlib",
             "-Zchecksum-hash-algorithm=sha256"
           ],
           "output_contract": {
@@ -48,10 +48,10 @@
             "2",
             "--output-json",
             "--compile",
-            "--emit=link=.chrono-harness/state/verify.worktree-lifecycle.rlib,dep-info=.chrono-harness/state/verify.worktree-lifecycle.rlib.d",
+            "--emit=link={operation_state}/verify.worktree-lifecycle.rlib,dep-info={operation_state}/verify.worktree-lifecycle.rlib.d",
             "crates/worktree/src/verified_lifecycle.rs",
             "-o",
-            ".chrono-harness/state/verify.worktree-lifecycle.rlib",
+            "{operation_state}/verify.worktree-lifecycle.rlib",
             "-Zchecksum-hash-algorithm=sha256"
           ],
           "output_contract": {
@@ -70,10 +70,10 @@
             "2",
             "--output-json",
             "--compile",
-            "--emit=link=.chrono-harness/state/verify.worktree-attention.rlib,dep-info=.chrono-harness/state/verify.worktree-attention.rlib.d",
+            "--emit=link={operation_state}/verify.worktree-attention.rlib,dep-info={operation_state}/verify.worktree-attention.rlib.d",
             "crates/worktree/src/verified_attention.rs",
             "-o",
-            ".chrono-harness/state/verify.worktree-attention.rlib",
+            "{operation_state}/verify.worktree-attention.rlib",
             "-Zchecksum-hash-algorithm=sha256"
           ],
           "output_contract": {
@@ -103,10 +103,10 @@
             "2",
             "--output-json",
             "--compile",
-            "--emit=link=.chrono-harness/state/verify.owner-publication-tests.rlib,dep-info=.chrono-harness/state/verify.owner-publication-tests.rlib.d",
+            "--emit=link={operation_state}/verify.owner-publication-tests.rlib,dep-info={operation_state}/verify.owner-publication-tests.rlib.d",
             "crates/worktree-tests/tests/verified_owner_publication.rs",
             "-o",
-            ".chrono-harness/state/verify.owner-publication-tests.rlib",
+            "{operation_state}/verify.owner-publication-tests.rlib",
             "-Zchecksum-hash-algorithm=sha256"
           ],
           "output_contract": {
@@ -125,10 +125,10 @@
             "2",
             "--output-json",
             "--compile",
-            "--emit=link=.chrono-harness/state/verify.worktree-lifecycle-tests.rlib,dep-info=.chrono-harness/state/verify.worktree-lifecycle-tests.rlib.d",
+            "--emit=link={operation_state}/verify.worktree-lifecycle-tests.rlib,dep-info={operation_state}/verify.worktree-lifecycle-tests.rlib.d",
             "crates/worktree-tests/tests/verified_lifecycle.rs",
             "-o",
-            ".chrono-harness/state/verify.worktree-lifecycle-tests.rlib",
+            "{operation_state}/verify.worktree-lifecycle-tests.rlib",
             "-Zchecksum-hash-algorithm=sha256"
           ],
           "output_contract": {
@@ -147,10 +147,10 @@
             "2",
             "--output-json",
             "--compile",
-            "--emit=link=.chrono-harness/state/verify.worktree-attention-tests.rlib,dep-info=.chrono-harness/state/verify.worktree-attention-tests.rlib.d",
+            "--emit=link={operation_state}/verify.worktree-attention-tests.rlib,dep-info={operation_state}/verify.worktree-attention-tests.rlib.d",
             "crates/worktree-tests/tests/verified_attention.rs",
             "-o",
-            ".chrono-harness/state/verify.worktree-attention-tests.rlib",
+            "{operation_state}/verify.worktree-attention-tests.rlib",
             "-Zchecksum-hash-algorithm=sha256"
           ],
           "output_contract": {

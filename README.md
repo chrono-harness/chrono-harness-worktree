@@ -59,3 +59,15 @@ workflow 判断原始 UTC 时间与宿主设定的 `max_age_hours`。上下文�
 `path:` 后是相对当前工作树的文件或目录。目录范围包括后代。用 `checkout` 声明整棵树。Git 的 index、HEAD、当前分支与指定的公共引用分别用 `git:index`、`git:head`、`git:branch` 和 `git:refs/heads/名字` 声明。同一仓库中的两个检出有各自的 index，可以竞争同一个实际分支引用。维护方应为实际会写 index 和 ref 的复合操作同时登记这两个资源。只有通过本入口进入并获得保护的命令参加调度；其他 Git 客户端仍使用 Git 自己的锁。
 
 启用此配置后，缺少范围的命令保守地占用当前工作树、其 Git 元数据和公共引用。具体命令只在与当前消费者的读写范围冲突时被拒绝，最后一个仍持有能力的子孙进程结束后可以重新进入。临时声明位于协调者的 operation-scopes 业务目录。正常返回、后续操作和定时维护都可回收到期声明。机器或服务中断期间没有墙钟清理上界。
+
+## 本仓本地检查的清理
+
+开发者运行 `mise exec -- ./check.sh` 时，工作树租约覆盖整个检查。准备输入和原报告写入 `.chrono-harness/state/preparation/`，单元结果在 `.chrono-harness/state/worktree/`，汇总在 `.chrono-harness/state/collection/`。各次执行的证明编译库和依赖清单随操作报告管理，原生构建使用专属的 `native-check/` 临时目录。需要保留的结果应在当日清理前复制到持久存储。
+
+完成工具安装后，可在主检出的用户 crontab 中登记每日 03:00 的滚动维护。将下方两个绝对路径替换为主检出和本机 `command -v mise` 的实际值。
+
+```cron
+0 3 * * * cd '/path/to/chrono-harness-worktree' && '/path/to/mise' exec -- chrono-worktree maintain --host-root . --config .chrono-harness/worktree.json
+```
+
+同一日历批次共用截止时刻。调度器在运行且取得排他租约时回收已登记的空闲目录。首次登记前已有的目录需要核对、转存并显式接管。普通任务工作树在超过 24 小时且唯一源码已保全后可整树回收；仍在使用的原件继续保管。工作树日志和处置报告在一天的窗口及当前使用方结束后滚动。工具包位于 mise 共享安装目录，本仓的 bin/ 只保存链接。
