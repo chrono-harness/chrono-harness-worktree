@@ -72,6 +72,25 @@ mod fixture_body_boundaries;
 mod inventory_failure_owner;
 
 verus! {
+#[cfg(verus_keep_ghost)]
+fn observation_uses_the_owners_exit_and_both_original_times() {
+    use policy::ObservationAgeReply::*;
+    let fresh = policy::observation_age_reply(0, true, true, false);
+    let stale = policy::observation_age_reply(1, true, false, true);
+    let diagnostic = policy::observation_age_reply(2, true, false, false);
+    let extra = policy::observation_age_reply(0, false, true, false);
+    let unexplained = policy::observation_age_reply(1, true, true, false);
+    let empty = policy::observation_age_reply(2, true, true, false);
+    assert(matches!(fresh, Fresh) && matches!(stale, Stale) && matches!(diagnostic, Diagnostic));
+    assert(matches!(extra, Invalid) && matches!(unexplained, Invalid) && matches!(empty, Invalid));
+    let same = policy::reuse_cached_observation(true, true, true);
+    let expired = policy::reuse_cached_observation(false, true, true);
+    let late = policy::reuse_cached_observation(true, true, false);
+    let changed = policy::reuse_cached_observation(true, false, true);
+    assert(same && !expired && !late && !changed);
+}
+
+
 
 #[cfg(verus_keep_ghost)]
 fn log_contract<T>(exit: i32, stderr_empty: bool, report: Option<T>, has_errors: bool) {
@@ -693,7 +712,7 @@ fn age_policy_requires_kernel_ownership_ordered_windows_and_a_trailing_slash() {
     expect(!policy::admits_age_policy(true, 1, 2, &empty));
 }
 
-#[cfg_attr(not(verus_keep_ghost), test)]
+#[cfg(verus_keep_ghost)]
 fn observation_at_the_threshold_waits_and_one_nanosecond_later_is_due() {
     let on_reuse = policy::age_window_passed(23_000_000_000, 23, 24, false);
     let past_reuse = policy::age_window_passed(23_000_000_001, 23, 24, false);
