@@ -149,13 +149,15 @@ fn related_file(
         let (Some(intent), Some(completed)) = (use_binding(&value), use_binding(&original)) else {
             return Ok(false);
         };
-        return Ok(original["managed_process_original"] == report["managed_process_original"]
-            && crate::verified_lifecycle::binds_use_intent(
-                &intent,
-                &completed,
-                report_path,
-                &format!("{report_path}.process"),
-            ));
+        return Ok(
+            original["managed_process_original"] == report["managed_process_original"]
+                && crate::verified_lifecycle::binds_use_intent(
+                    &intent,
+                    &completed,
+                    report_path,
+                    &format!("{report_path}.process"),
+                ),
+        );
     }
     if value["report_path"] == report_path
         && value["source_root"] == value!(root)
