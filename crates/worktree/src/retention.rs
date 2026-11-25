@@ -17,7 +17,7 @@ use std::{
 pub(crate) const POLICY_PATH: &str = ".chrono-harness/retention.json";
 
 thread_local! {
-    static SESSIONS: RefCell<BTreeMap<PathBuf, Weak<RefCell<Session>>>> = RefCell::new(BTreeMap::new());
+    static SESSIONS: RefCell<BTreeMap<(PathBuf, bool), Weak<RefCell<Session>>>> = RefCell::new(BTreeMap::new());
 }
 
 /// Forward active host-original capabilities whenever worktree starts a native child.
@@ -54,14 +54,18 @@ impl Inventory {
         let root = fs::canonicalize(root).map_err(|e| e.to_string())?;
         let session = SESSIONS.with(|all| -> Result<_, String> {
             let mut all = all.borrow_mut();
-            if let Some(existing) = all.get(&root).and_then(Weak::upgrade) {
+            let key = (
+                root.clone(),
+                crate::maintenance_signal::RoundGuard::active(),
+            );
+            if let Some(existing) = all.get(&key).and_then(Weak::upgrade) {
                 return Ok(existing);
             }
             all.retain(|_, weak| weak.strong_count() != 0);
             let mut session = Session::open(&root)?;
             session.call::<()>(json!({"operation":"explicit-read-scopes"}))?;
             let session = Rc::new(RefCell::new(session));
-            all.insert(root.clone(), Rc::downgrade(&session));
+            all.insert(key, Rc::downgrade(&session));
             Ok(session)
         })?;
         Ok(Some(Self { root, session }))

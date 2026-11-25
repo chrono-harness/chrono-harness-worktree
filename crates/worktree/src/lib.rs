@@ -18,7 +18,7 @@ pub fn successful_report_status(status: Option<&str>) -> (successful: bool)
                 || text@ == "finished"@
                 || text@ == "maintained"@
                 || text@ == "maintenance-requested"@
-                || text@ == "maintenance-idle-exit"@
+                || text@ == "maintenance-queue-empty"@
                 || text@ == "imported"@
                 || text@ == "migrated"@
                 || text@ == "owner-deployed"@
@@ -36,7 +36,7 @@ pub fn successful_report_status(status: Option<&str>) -> (successful: bool)
             || <&str>::exec_eq(text, "finished")
             || <&str>::exec_eq(text, "maintained")
             || <&str>::exec_eq(text, "maintenance-requested")
-            || <&str>::exec_eq(text, "maintenance-idle-exit")
+            || <&str>::exec_eq(text, "maintenance-queue-empty")
             || <&str>::exec_eq(text, "imported")
             || <&str>::exec_eq(text, "migrated")
             || <&str>::exec_eq(text, "owner-deployed")
@@ -174,6 +174,14 @@ pub struct Environment {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg(not(verus_keep_ghost))]
+pub struct MaintenanceOperation {
+    pub program: String,
+    pub args: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg(not(verus_keep_ghost))]
 pub struct Config {
     pub schema: String,
     #[serde(default)]
@@ -186,6 +194,8 @@ pub struct Config {
     pub registration_program: Option<String>,
     #[serde(default)]
     pub diagnostics_program: Option<String>,
+    #[serde(default)]
+    pub maintenance_operations: BTreeMap<String, MaintenanceOperation>,
     pub host_config: String,
     pub remote: String,
     pub git: Git,
@@ -299,7 +309,7 @@ pub fn run(args: &[String]) -> CliOutput {
         };
     }
     if args == ["--help"] {
-        return CliOutput { exit_code: 0, stdout: "chrono-worktree start --host-root ROOT --config PATH --kind feature|integration --name TASK --path DESTINATION\nchrono-worktree reconstruct --host-root ROOT --config PATH --kind feature|integration --name TASK --path DESTINATION --plan STATE_PATH\nchrono-worktree inspect-rebind|rebind|resume-rebind|recover|recover-interrupted|cleanup|cleanup-fetch|cleanup-fetch-interrupted|cleanup-remote|retire-evidence --host-root ROOT --config PATH --plan STATE_PATH\nchrono-worktree finish [--path WORKTREE] [--dispose-evidence] [--artifacts-only] [--retained-commit OID]\nchrono-worktree maintain\nchrono-worktree maintenance-service [--host-root COORDINATOR]\nchrono-worktree status [--path WORKTREE]\nchrono-worktree import --path WORKTREE\nchrono-worktree migrate --path WORKTREE [--adopt-cleanup-policy] [--adopt-cache STATE_PATH] [--adopt-fixtures STATE_PATH] [--partition-producer ID]\nchrono-worktree use [--path WORKTREE] --operation REGISTERED_OPERATION\nLifecycle commands default to --host-root . --config .chrono-harness/worktree.json; require explicit automatic-cleanup adoption. Unified maintenance uses adopted OS socket activation; idle/timer policy is in maintenance.json. No PR/merge verdict.\n".into(), stderr: String::new() };
+        return CliOutput { exit_code: 0, stdout: "chrono-worktree start --host-root ROOT --config PATH --kind feature|integration --name TASK --path DESTINATION\nchrono-worktree reconstruct --host-root ROOT --config PATH --kind feature|integration --name TASK --path DESTINATION --plan STATE_PATH\nchrono-worktree inspect-rebind|rebind|resume-rebind|recover|recover-interrupted|cleanup|cleanup-fetch|cleanup-fetch-interrupted|cleanup-remote|retire-evidence --host-root ROOT --config PATH --plan STATE_PATH\nchrono-worktree finish [--path WORKTREE] [--dispose-evidence] [--artifacts-only] [--retained-commit OID]\nchrono-worktree maintain\nchrono-worktree maintenance-service [--host-root COORDINATOR]\nchrono-worktree status [--path WORKTREE]\nchrono-worktree import --path WORKTREE\nchrono-worktree migrate --path WORKTREE [--adopt-cleanup-policy] [--adopt-cache STATE_PATH] [--adopt-fixtures STATE_PATH] [--partition-producer ID]\nchrono-worktree use [--path WORKTREE] --operation REGISTERED_OPERATION\nLifecycle commands default to --host-root . --config .chrono-harness/worktree.json; require explicit automatic-cleanup adoption. Unified maintenance uses adopted OS socket activation; event-only policy is in maintenance.json. No PR/merge verdict.\n".into(), stderr: String::new() };
     }
     if args.first().map(String::as_str) == Some("adopted-owner-v1") {
         return match automatic::adopted_owner(args) {
@@ -449,6 +459,11 @@ pub fn reconstruct(options: Start, plan_path: &str) -> Result<serde_json::Value,
     let plan = reconstruct::read(&options.root, plan_path)?;
     start::create(options, config, bytes, Some(plan))
 }
+
+#[doc(hidden)]
+#[cfg(feature = "producer-birth-test")]
+#[cfg(not(verus_keep_ghost))]
+pub use automatic::service::maintain_host_operations;
 
 #[doc(hidden)]
 #[cfg(unix)]

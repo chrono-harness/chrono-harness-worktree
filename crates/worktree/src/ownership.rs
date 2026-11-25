@@ -76,6 +76,10 @@ impl Lease {
                 }
             }
         }
+        Self::held(file, path, id, directory).map(Some)
+    }
+
+    fn held(file: File, path: &Path, id: String, directory: bool) -> Result<Self, String> {
         let scope = Scope::new(&[file.as_fd()])?;
         let lease = Self {
             file,
@@ -85,7 +89,7 @@ impl Lease {
             _scope: scope,
         };
         lease.stable()?;
-        Ok(Some(lease))
+        Ok(lease)
     }
 
     pub(crate) fn acquire(
@@ -95,6 +99,11 @@ impl Lease {
         exclusive: bool,
         wait: Option<Duration>,
     ) -> Result<Option<Self>, String> {
+        let file = Self::open_lease_file(path, expected, create)?;
+        Self::lock(file, path, expected, false, exclusive, wait)
+    }
+
+    fn open_lease_file(path: &Path, expected: Option<&str>, create: bool) -> Result<File, String> {
         let mut options = OpenOptions::new();
         options
             .read(true)
@@ -114,7 +123,19 @@ impl Lease {
                 .open(path)
                 .map_err(|e| format!("ownership lease unavailable; preserve work: {e}"))?
         };
-        Self::lock(file, path, expected, false, exclusive, wait)
+        Ok(file)
+    }
+
+    /// Only an activated worker may block on this physical coordinator's lock.
+    pub(crate) fn exclusive_blocking(path: &Path) -> Result<Self, String> {
+        let file = Self::open_lease_file(path, None, true)?;
+        let metadata = file.metadata().map_err(|e| e.to_string())?;
+        if !metadata.is_file() {
+            return Err("unexpected ownership lease type".into());
+        }
+        let id = inode(&metadata);
+        file.lock().map_err(|e| e.to_string())?;
+        Self::held(file, path, id, false)
     }
 
     pub(crate) fn stable(&self) -> Result<(), String> {

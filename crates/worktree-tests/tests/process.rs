@@ -128,3 +128,160 @@ fn registration_receives_only_the_selected_nested_tool_path() {
         assert_eq!(command.env.len(), usize::from(path.is_some()));
     }
 }
+
+#[test]
+fn maintenance_records_failure_and_still_runs_later_host_operations() {
+    let dir = tempfile::tempdir().unwrap();
+    std::os::unix::fs::symlink(
+        env!("CARGO_BIN_EXE_mock-worktree-child"),
+        dir.path().join("fixture"),
+    )
+    .unwrap();
+    let config = serde_json::from_value(json!({
+        "schema":"chrono-worktree-config/v1", "host_config":".chrono-harness/config.json",
+        "remote":"origin", "git":{"program":"git"}, "environment":{"inherit":[],"values":{}},
+        "timeout_seconds":5, "output_limit_bytes":1024, "report_directory":".chrono-harness/state/worktree/",
+        "maintenance_operations":{
+            "absent":{"program":"missing","args":[]},
+            "failed":{"program":"fixture","args":["streams"]},
+            "joined":{"program":"fixture","args":["leave-child", "child-result"]}
+        }
+    })).unwrap();
+    let mut report = json!({});
+    let mut failures = Vec::new();
+    chrono_worktree::maintain_host_operations(dir.path(), &config, &mut report, &mut failures);
+    assert_eq!(failures.len(), 2);
+    let result = &report["maintenance_operations"];
+    assert!(
+        result["absent"]["error"]
+            .as_str()
+            .unwrap()
+            .contains("missing")
+    );
+    assert_eq!(result["failed"]["exit_code"], 7);
+    assert_eq!(result["failed"]["stderr_sha256"], digest(&[255, 254]));
+    assert_eq!(result["joined"]["exit_code"], 0);
+    assert_eq!(result["joined"]["owned_work_joined"], true);
+    assert_eq!(
+        std::fs::read(dir.path().join("child-result")).unwrap(),
+        b"finished"
+    );
+}
+
+#[test]
+fn socket_batches_events_and_retains_new_events_after_owner_failure() {
+    use std::os::unix::net::UnixDatagram;
+    let (executor, sender) = UnixDatagram::pair().unwrap();
+    let mut rounds = 0;
+    chrono_worktree::serve_maintenance_socket(&executor, || panic!("empty queue ran a round"))
+        .unwrap();
+    sender.send(b"first").unwrap();
+    sender.send(b"second").unwrap();
+    let result = chrono_worktree::serve_maintenance_socket(&executor, || {
+        rounds += 1;
+        sender.send(b"during-round").unwrap();
+        Err("owner failed".into())
+    });
+    assert_eq!(result.unwrap_err(), "owner failed");
+    chrono_worktree::serve_maintenance_socket(&executor, || {
+        rounds += 1;
+        if rounds == 2 {
+            sender.send(b"new-batch").unwrap();
+        }
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(rounds, 3);
+}
+
+#[test]
+fn activated_service_preserves_queue_while_competing_for_the_same_lease() {
+    use std::{fs, os::unix::net::UnixDatagram, sync::mpsc, thread};
+    // Unix socket names must fit sockaddr_un on both supported kernels.
+    let dir = tempfile::tempdir_in("/tmp").unwrap();
+    let root = fs::canonicalize(dir.path()).unwrap();
+    let state = root.join(".chrono-harness/state");
+    fs::create_dir_all(&state).unwrap();
+    fs::write(root.join(".chrono-harness/maintenance.json"), serde_json::to_vec(&json!({
+        "schema":"chrono-unified-maintenance/v2","state_directory":".chrono-harness/state/owner/",
+        "socket":".chrono-harness/state/socket"
+    })).unwrap()).unwrap();
+    let socket = UnixDatagram::bind(state.join("socket")).unwrap();
+    let service = || socket.try_clone().unwrap();
+    let result =
+        chrono_worktree::run_maintenance_service_socket(&root, "missing", service()).unwrap();
+    assert_eq!(result["status"], "maintenance-queue-empty");
+    assert!(!state.join("owner").exists());
+
+    fs::create_dir(state.join("owner")).unwrap();
+    let lease = fs::File::create(state.join("owner/maintenance.lease")).unwrap();
+    lease.lock().unwrap();
+    UnixDatagram::unbound()
+        .unwrap()
+        .send_to(b"work", state.join("socket"))
+        .unwrap();
+    let (arrived, before_lease) = mpsc::channel();
+    let (resume, finish) = mpsc::channel();
+    let worker_root = root.clone();
+    let inherited = service();
+    let worker = thread::spawn(move || {
+        chrono_worktree::with_maintenance_observer(
+            move |kind, _| {
+                if kind == "service-before-lease" {
+                    arrived.send(()).unwrap();
+                    finish.recv().unwrap();
+                }
+            },
+            || {
+                chrono_worktree::run_maintenance_service_socket(
+                    &worker_root,
+                    ".chrono-harness/missing",
+                    inherited,
+                )
+            },
+        )
+    });
+    before_lease.recv_timeout(Duration::from_secs(10)).unwrap();
+    resume.send(()).unwrap();
+    // The lock owner's successor can still take the queued hint; a crashed
+    // waiter must not consume it before ownership is obtained.
+    socket.set_nonblocking(true).unwrap();
+    let mut original = [0u8; 4];
+    assert_eq!(socket.recv(&mut original).unwrap(), 4);
+    assert_eq!(&original, b"work");
+    drop(lease);
+    assert_eq!(
+        worker.join().unwrap().unwrap()["status"],
+        "maintenance-queue-empty"
+    );
+
+    UnixDatagram::unbound()
+        .unwrap()
+        .send_to(b"next", state.join("socket"))
+        .unwrap();
+    let error = chrono_worktree::run_maintenance_service_socket(
+        &root,
+        ".chrono-harness/missing",
+        service(),
+    )
+    .unwrap_err();
+    assert!(error.contains("No such file"), "{error}");
+}
+
+#[test]
+fn socket_starts_a_second_round_for_the_sixty_fifth_queued_hint() {
+    use std::os::unix::net::UnixDatagram;
+    let (executor, sender) = UnixDatagram::pair().unwrap();
+    rustix::net::sockopt::set_socket_recv_buffer_size(&executor, 262_144).unwrap();
+    sender.set_nonblocking(true).unwrap();
+    for _ in 0..65 {
+        sender.send(b"x").unwrap();
+    }
+    let mut rounds = 0;
+    chrono_worktree::serve_maintenance_socket(&executor, || {
+        rounds += 1;
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(rounds, 2);
+}

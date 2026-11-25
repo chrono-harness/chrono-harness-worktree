@@ -61,6 +61,7 @@ name = "chrono-worktree-tests"
 version = "0.1.0"
 dependencies = [
  "chrono-worktree",
+ "rustix",
  "serde_json",
  "sha2",
  "tempfile",

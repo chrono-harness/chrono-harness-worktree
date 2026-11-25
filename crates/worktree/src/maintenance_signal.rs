@@ -60,20 +60,16 @@ pub struct Policy {
     pub schema: String,
     pub state_directory: String,
     pub socket: String,
-    pub idle_seconds: Option<u64>,
-    pub timer_seconds: u64,
 }
 impl Policy {
     pub(crate) fn validate(&self) -> Result<(), String> {
         relative_path(self.state_directory.trim_end_matches('/'))?;
         relative_path(&self.socket)?;
-        if self.schema != "chrono-unified-maintenance/v1"
+        if self.schema != "chrono-unified-maintenance/v2"
             || !self.state_directory.starts_with(".chrono-harness/state/")
             || !self.state_directory.ends_with('/')
             || !self.socket.starts_with(".chrono-harness/state/")
             || self.socket.ends_with('/')
-            || self.timer_seconds == 0
-            || self.idle_seconds == Some(0)
         {
             return Err("invalid unified maintenance policy".into());
         }
@@ -98,6 +94,9 @@ pub(crate) fn adopted(root: &Path) -> Result<Option<(Policy, Vec<u8>)>, String> 
 thread_local! {static DEPTH:Cell<usize>=const{Cell::new(0)};}
 pub(crate) struct RoundGuard;
 impl RoundGuard {
+    pub(crate) fn active() -> bool {
+        DEPTH.with(|depth| depth.get() > 0)
+    }
     pub(crate) fn enter() -> Self {
         DEPTH.with(|depth| depth.set(depth.get() + 1));
         Self
@@ -123,7 +122,7 @@ pub(crate) fn send(path: &Path, hint: &[u8]) -> Result<(), String> {
 }
 
 pub(crate) fn announce_adopted(root: &Path, reason: &str) {
-    if DEPTH.with(|depth| depth.get() > 0) {
+    if RoundGuard::active() {
         return;
     }
     let mut receipt = json!({"schema":"chrono-maintenance-request/v1","reason":reason,"accepted":false,
