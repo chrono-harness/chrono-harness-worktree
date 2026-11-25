@@ -57,7 +57,7 @@ pub enum Policy {
     Scoped {
         collection_manifest: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        single_file_directory: Option<String>,
+        optional_input_file: Option<String>,
     },
 }
 
@@ -68,7 +68,7 @@ pub struct FullPolicy {
     #[serde(default = "default_observation_age_program")]
     pub observation_age_program: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub single_file_directory: Option<String>,
+    pub optional_input_file: Option<String>,
     pub origin_path: String,
     pub context_path: String,
     pub collection_manifest: String,
@@ -82,13 +82,13 @@ fn default_observation_age_program() -> String {
 
 #[cfg(not(verus_keep_ghost))]
 impl Policy {
-    fn single_file_directory(&self) -> Option<&str> {
+    fn optional_input_file(&self) -> Option<&str> {
         match self {
-            Self::Full(policy) => policy.single_file_directory.as_deref(),
+            Self::Full(policy) => policy.optional_input_file.as_deref(),
             Self::Scoped {
-                single_file_directory,
+                optional_input_file,
                 ..
-            } => single_file_directory.as_deref(),
+            } => optional_input_file.as_deref(),
         }
     }
 
@@ -106,7 +106,7 @@ impl Policy {
 #[cfg(not(verus_keep_ghost))]
 pub(crate) fn validate(policy: &Policy) -> Result<(), String> {
     artifact_path(policy.collection_manifest())?;
-    if let Some(path) = policy.single_file_directory() {
+    if let Some(path) = policy.optional_input_file() {
         artifact_path(path)?;
         if path
             .split('/')
@@ -269,17 +269,15 @@ fn produce(
                 .config
                 .check_inputs
                 .as_ref()
-                .and_then(Policy::single_file_directory)
+                .and_then(Policy::optional_input_file)
                 .map(str::to_owned);
-            let observe = || {
-                input
-                    .as_ref()
-                    .map(|path| observe_input_directory(root, path))
-                    .transpose()
+            let observe = || match input.as_deref() {
+                Some(path) => observe_input_directory(root, path),
+                None => Ok(None),
             };
             let initial_input = observe()?;
             if let Some(path) = &input {
-                report["single_file_directory"] = json!({"path":path,"file":initial_input});
+                report["optional_input_file"] = json!({"path":path,"identity":initial_input});
             }
             let verify_input = || -> Result<(), String> {
                 if observe()? != initial_input {
