@@ -4460,16 +4460,22 @@ impl Manager {
                         .ok_or("cache history result missing")?;
                     let result = json(&self.receipt(receipt)?)?;
                     let intent = json(&self.receipt(&attempt.intent)?)?;
-                    if receipt.path != attempt.path
-                        || result["status"] != "cleaned"
-                        || result["destination"] != value!(entry.path)
-                        || result["cache_generation"] != attempt.generation
-                        || result["cache_intent"] != value!(attempt.intent)
-                        || intent["binding"]["path"] != value!(entry.path)
-                        || intent["binding"]["attachment"] != value!(entry.attachment)
-                        || intent["binding"]["generation"] != attempt.generation
-                        || intent["binding"]["lease_id"] != owner.id
-                    {
+                    let binding = crate::verified_lifecycle::CacheHistoryBinding {
+                        receipt_matches: receipt.path == attempt.path,
+                        result_checkout_matches: result["destination"] == value!(entry.path),
+                        result_generation_matches: result["cache_generation"] == attempt.generation,
+                        result_intent_matches: result["cache_intent"] == value!(attempt.intent),
+                        intent_checkout_matches: intent["binding"]["path"] == value!(entry.path),
+                        intent_attachment_matches: intent["binding"]["attachment"]
+                            == value!(entry.attachment),
+                        intent_generation_matches: intent["binding"]["generation"]
+                            == attempt.generation,
+                        owner_matches: intent["binding"]["lease_id"] == owner.id,
+                    };
+                    if !crate::verified_lifecycle::cache_history_result(
+                        &binding,
+                        result["status"].as_str().unwrap_or(""),
+                    ) {
                         return Err(
                             "cache history original does not establish completed generation".into(),
                         );
@@ -4559,15 +4565,13 @@ impl Manager {
                     .terminal
                     .as_ref()
                     .ok_or("disposed record lacks its terminal handoff")?;
-                if !entry.uses.is_empty()
-                    || entry.report_handoff_pending()
-                    || entry.cache_only
-                    || terminal.artifacts_only
-                    || entry
-                        .ownership
-                        .as_ref()
-                        .is_none_or(|owner| owner.cache_pending)
-                {
+                if !crate::verified_lifecycle::terminal_history_ready(
+                    entry.uses.len(),
+                    entry.report_handoff_pending(),
+                    entry.cache_only,
+                    terminal.artifacts_only,
+                    entry.ownership.as_ref().map(|owner| owner.cache_pending),
+                ) {
                     return Err("disposed history still has unresolved responsibilities".into());
                 }
                 let lease = self
@@ -4580,29 +4584,32 @@ impl Manager {
                     .ok_or("disposed history lacks its original cleanup result")?;
                 let original = json(&self.receipt(receipt)?)?;
                 let handoff = entry.terminal_handoff()?;
-                let matches_handoff = if let Some(handoff) = handoff {
-                    original["terminal_handoff"] == handoff
-                        || original["terminal_receipt"] == value!(terminal.receipt)
+                let inline = handoff.map(|facts| original["terminal_handoff"] == facts);
+                let original_matches = if inline.is_none() {
+                    let facts = json(&self.receipt(&terminal.receipt)?)?;
+                    facts["path"] == value!(entry.path)
+                        && facts["attachment"] == value!(entry.attachment)
+                        && facts["head"] == terminal.head
                 } else {
-                    let handoff = json(&self.receipt(&terminal.receipt)?)?;
-                    original["terminal_receipt"] == value!(terminal.receipt)
-                        && handoff["path"] == value!(entry.path)
-                        && handoff["attachment"] == value!(entry.attachment)
-                        && handoff["head"] == terminal.head
+                    false
                 };
-                if !matches_handoff
-                    || original["destination"] != value!(entry.path)
-                    || original["head"] != terminal.head
-                    || entry.cleanup.as_ref().is_none_or(|progress| {
-                        progress.stage != crate::verified_lifecycle::CleanupStage::Disposed
-                            || progress.report_path.as_deref() != Some(receipt.path.as_str())
-                    })
-                    || crate::verified_lifecycle::cleanup_result(
-                        false,
-                        original["status"].as_str().unwrap_or(""),
-                        original["worktree_removal"].as_str().unwrap_or(""),
-                    ) != crate::verified_lifecycle::CleanupStage::Disposed
-                {
+                let matches_handoff = crate::verified_lifecycle::terminal_history_handoff(
+                    inline,
+                    original["terminal_receipt"] == value!(terminal.receipt),
+                    original_matches,
+                );
+                let progress = entry.cleanup.as_ref();
+                if !crate::verified_lifecycle::terminal_history_result(
+                    matches_handoff,
+                    original["destination"] == value!(entry.path),
+                    original["head"] == terminal.head,
+                    progress.is_some_and(|p| {
+                        p.stage == crate::verified_lifecycle::CleanupStage::Disposed
+                    }),
+                    progress.and_then(|p| p.report_path.as_deref()) == Some(receipt.path.as_str()),
+                    original["status"].as_str().unwrap_or(""),
+                    original["worktree_removal"].as_str().unwrap_or(""),
+                ) {
                     return Err(
                         "disposed history original does not establish this attachment's removal"
                             .into(),

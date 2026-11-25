@@ -47,6 +47,76 @@ fn use_intent_uses_one_completed_operation_and_its_own_process() {
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn terminal_history_preserves_unfinished_responsibilities_and_unknown_ownership() {
+    expect(policy::terminal_history_ready(0, false, false, false, Some(false)));
+    expect(!policy::terminal_history_ready(1, false, false, false, Some(false)));
+    expect(!policy::terminal_history_ready(0, true, false, false, Some(false)));
+    expect(!policy::terminal_history_ready(0, false, true, false, Some(false)));
+    expect(!policy::terminal_history_ready(0, false, false, true, Some(false)));
+    expect(!policy::terminal_history_ready(0, false, false, false, Some(true)));
+    expect(!policy::terminal_history_ready(0, false, false, false, None));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn terminal_history_checks_each_supported_evidence_source() {
+    expect(policy::terminal_history_handoff(Some(true), false, false));
+    expect(policy::terminal_history_handoff(Some(false), true, false));
+    expect(!policy::terminal_history_handoff(Some(false), false, true));
+    expect(policy::terminal_history_handoff(None, true, true));
+    expect(!policy::terminal_history_handoff(None, true, false));
+    expect(!policy::terminal_history_handoff(None, false, true));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn terminal_history_requires_bound_disposal_under_both_originals() {
+    broadcast use vstd::string::group_string_axioms;
+    proof {
+        reveal_strlit("cleaned"); assert("cleaned"@.len() == 7);
+        reveal_strlit("failed"); assert("failed"@.len() == 6);
+        reveal_strlit("preserved"); assert("preserved"@.len() == 9);
+        reveal_strlit("verified-absent"); assert("verified-absent"@.len() == 15);
+        reveal_strlit("already-absent"); assert("already-absent"@.len() == 14);
+    }
+    expect(policy::terminal_history_result(true, true, true, true, true, "cleaned", "verified-absent"));
+    expect(policy::terminal_history_result(true, true, true, true, true, "cleaned", "already-absent"));
+    expect(!policy::terminal_history_result(true, true, true, true, true, "failed", "verified-absent"));
+    expect(!policy::terminal_history_result(true, true, true, true, true, "cleaned", "preserved"));
+    expect(!policy::terminal_history_result(false, true, true, true, true, "cleaned", "verified-absent"));
+    expect(!policy::terminal_history_result(true, false, true, true, true, "cleaned", "verified-absent"));
+    expect(!policy::terminal_history_result(true, true, false, true, true, "cleaned", "verified-absent"));
+    expect(!policy::terminal_history_result(true, true, true, false, true, "cleaned", "verified-absent"));
+    expect(!policy::terminal_history_result(true, true, true, true, false, "cleaned", "verified-absent"));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn cache_history_requires_both_the_exact_intent_and_the_completed_result() {
+    broadcast use vstd::string::group_string_axioms;
+    proof { reveal_strlit("cleaned"); assert("cleaned"@.len() == 7);
+        reveal_strlit("failed"); assert("failed"@.len() == 6); }
+    let exact = policy::CacheHistoryBinding { receipt_matches: true, result_checkout_matches: true,
+        result_generation_matches: true, result_intent_matches: true, intent_checkout_matches: true,
+        intent_attachment_matches: true, intent_generation_matches: true, owner_matches: true };
+    expect(policy::cache_history_result(&exact,"cleaned"));
+    expect(!policy::cache_history_result(&exact,"failed"));
+    let bad = policy::CacheHistoryBinding { receipt_matches: false, ..exact };
+    expect(!policy::cache_history_result(&bad, "cleaned"));
+    let bad = policy::CacheHistoryBinding { result_checkout_matches: false, ..exact };
+    expect(!policy::cache_history_result(&bad, "cleaned"));
+    let bad = policy::CacheHistoryBinding { result_generation_matches: false, ..exact };
+    expect(!policy::cache_history_result(&bad, "cleaned"));
+    let bad = policy::CacheHistoryBinding { result_intent_matches: false, ..exact };
+    expect(!policy::cache_history_result(&bad, "cleaned"));
+    let bad = policy::CacheHistoryBinding { intent_checkout_matches: false, ..exact };
+    expect(!policy::cache_history_result(&bad, "cleaned"));
+    let bad = policy::CacheHistoryBinding { intent_attachment_matches: false, ..exact };
+    expect(!policy::cache_history_result(&bad, "cleaned"));
+    let bad = policy::CacheHistoryBinding { intent_generation_matches: false, ..exact };
+    expect(!policy::cache_history_result(&bad, "cleaned"));
+    let bad = policy::CacheHistoryBinding { owner_matches: false, ..exact };
+    expect(!policy::cache_history_result(&bad, "cleaned"));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn terminal_history_keeps_unknown_future_live_and_unexpired_records() {
     let boundary = policy::retire_history(true, true, Some(100), 110, 10, false);
     let young = policy::retire_history(true, true, Some(100), 109, 10, false);
