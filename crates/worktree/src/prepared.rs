@@ -196,18 +196,10 @@ pub(crate) fn retain(root: &Path, prefix: &str, value: &Value) -> Result<String,
         .map_err(|e| e.to_string())?
         .to_str()
         .ok_or("original path not UTF-8")?;
-    if let Some(inventory) = crate::retention::Inventory::adopted(&root)? {
-        if inventory.accepts("check-original", relative)? {
-            let publication = inventory.create_referenced(
-                "check-original",
-                relative,
-                "publication-recheck",
-                json!({"publication":"started","outcome":"not-established"}),
-            )?;
-            publication.replace_file(&file, &raw)?;
-            publication.complete(outcome)?;
-            return Ok(relative.into());
-        }
+    // The input producer owns a publication read scope until it hands the
+    // context to its report. Its output capability covers this publication.
+    if crate::retention::publish_owned_original(&root, "check-original", relative, &raw, outcome)? {
+        return Ok(relative.into());
     }
     let mut output = fs::File::create_new(&file).map_err(|e| e.to_string())?;
     output
