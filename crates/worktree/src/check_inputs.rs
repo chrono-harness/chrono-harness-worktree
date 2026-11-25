@@ -370,10 +370,17 @@ fn produce(
                                     },
                                 )
                             };
-                            fresh(&previous).map_err(|e| format!("E_LOCAL_CONTEXT: {e}"))?;
+                            let cached_fresh =
+                                fresh(&previous).map_err(|e| format!("E_LOCAL_CONTEXT: {e}"))?;
                             let mut comparison = previous.clone();
                             comparison["observed_at"] = ctx["observed_at"].clone();
-                            if comparison == ctx && fresh(&ctx)? {
+                            let matching_context = comparison == ctx;
+                            let current_fresh = matching_context && fresh(&ctx)?;
+                            if crate::verified_lifecycle::reuse_cached_observation(
+                                cached_fresh,
+                                matching_context,
+                                current_fresh,
+                            ) {
                                 ctx = previous;
                             }
                         }

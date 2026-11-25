@@ -13,6 +13,18 @@ fn calls_the_selected_workflow_and_distinguishes_staleness_from_failure() {
         (
             2,
             "",
+            "",
+            Err("workflow age check returned 2: ; stdout=[]".into()),
+        ),
+        (
+            1,
+            "x",
+            "E_BRANCH_STALE: old",
+            Err("workflow age check returned 1: E_BRANCH_STALE: old; stdout=[120]".into()),
+        ),
+        (
+            2,
+            "",
             "E_BRANCH_CONTEXT: original error\n",
             Err("E_BRANCH_CONTEXT: original error".to_string()),
         ),

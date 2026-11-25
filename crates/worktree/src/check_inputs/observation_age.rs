@@ -1,4 +1,5 @@
 use crate::process::CommandSpec;
+use crate::verified_lifecycle::{ObservationAgeReply, observation_age_reply};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
@@ -32,11 +33,16 @@ pub fn check(
     )?;
     let diagnostic = String::from_utf8(stderr).map_err(|e| e.to_string())?;
     let message = diagnostic.strip_suffix('\n').unwrap_or(&diagnostic);
-    match code {
-        0 if stdout.is_empty() && message.is_empty() => Ok(true),
-        1 if stdout.is_empty() && message.starts_with("E_BRANCH_STALE:") => Ok(false),
-        2 if stdout.is_empty() && !message.is_empty() => Err(message.to_owned()),
-        _ => Err(format!(
+    match observation_age_reply(
+        code,
+        stdout.is_empty(),
+        message.is_empty(),
+        message.starts_with("E_BRANCH_STALE:"),
+    ) {
+        ObservationAgeReply::Fresh => Ok(true),
+        ObservationAgeReply::Stale => Ok(false),
+        ObservationAgeReply::Diagnostic => Err(message.to_owned()),
+        ObservationAgeReply::Invalid => Err(format!(
             "workflow age check returned {code}: {message}; stdout={stdout:?}"
         )),
     }
