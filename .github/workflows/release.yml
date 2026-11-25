@@ -16,15 +16,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source_oid=$(git rev-parse HEAD)
-          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
-            test "$source_oid" = "$(git rev-parse refs/remotes/origin/main)"
-          elif [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+[.][0-9]+[.][0-9]+-[0-9A-Za-z.-]+$ ]]; then
-            git merge-base --is-ancestor "$source_oid" refs/remotes/origin/dev
-          else
-            echo "Unsupported release tag: $GITHUB_REF_NAME" >&2
-            exit 1
-          fi
+          directory=$(mktemp -d "$RUNNER_TEMP/tag-check.XXXXXXXX")
+          trap 'rm -rf -- "$directory"' EXIT
+          curl --fail --silent --show-error --location \
+            'https://github.com/chrono-harness/chrono-harness-host-release/releases/download/v0.1.0-alpha.21/chrono-host-release-linux-x86_64' \
+            --output "$directory/chrono-host-release"
+          (cd "$directory" && echo '53f966841373df821abf14eb726907ed2c6192bf948e8743fa4952e0818fd5e3  chrono-host-release' | sha256sum --check --status)
+          chmod 700 "$directory/chrono-host-release"
+          "$directory/chrono-host-release" check-pushed-tag "$GITHUB_REF_NAME"
   build:
     needs: source
     strategy:
