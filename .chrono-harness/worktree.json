@@ -1,8 +1,8 @@
 {
-  "schema": "chrono-worktree-config/v2",
+  "schema": "chrono-worktree-config/v3",
   "host_config": ".chrono-harness/config.json",
-  "diagnostics_program": ".chrono-harness/bin/chrono-diagnostics",
-  "registration_program": ".chrono-harness/bin/chrono-judge-registration",
+  "diagnostics_program": "chrono-diagnostics",
+  "registration_program": "chrono-judge-registration",
   "remote": "origin",
   "git": {
     "program": "git",
@@ -23,12 +23,13 @@
   "output_limit_bytes": 1048576,
   "report_directory": ".chrono-harness/state/worktrees/",
   "check_inputs": {
-    "origin_path": ".chrono-harness/state/origin.json",
+    "origin_path": ".chrono-harness/state/origins/current.json",
     "context_path": ".chrono-harness/state/local/context.json",
     "collection_manifest": ".chrono-harness/state/collection/manifest.json",
     "roles": {
       "feature": "integration",
       "integration": "integration"
     }
-  }
+  },
+  "automatic_cleanup": ".chrono-harness/cleanup.json"
 }

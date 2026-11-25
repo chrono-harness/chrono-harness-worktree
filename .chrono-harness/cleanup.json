@@ -1,0 +1,59 @@
+{
+  "schema": "chrono-worktree-automatic-cleanup/v2",
+  "coordinator_root": "git-main-worktree",
+  "state_directory": ".chrono-harness/state/automatic-cleanup-v2/",
+  "retained_ref": "refs/heads/dev",
+  "retention": "ancestor",
+  "remove_branch": false,
+  "allow_evidence_disposal": true,
+  "age_policy": {
+    "reuse_after_seconds": 82800,
+    "delete_after_seconds": 86400,
+    "preserved_branch_prefix": "retained/"
+  },
+  "artifacts": [
+    {
+      "path": ".chrono-harness/bin/",
+      "disposition": "dispose"
+    },
+    {
+      "path": ".chrono-harness/state/native-check/",
+      "disposition": "dispose"
+    },
+    {
+      "path": ".chrono-harness/state/preparation/",
+      "disposition": "dispose"
+    },
+    {
+      "path": ".chrono-harness/state/collection/",
+      "disposition": "dispose"
+    },
+    {
+      "path": ".chrono-harness/state/worktree/",
+      "disposition": "dispose"
+    },
+    {
+      "path": ".chrono-harness/state/worktrees/",
+      "disposition": "finish-dispose"
+    },
+    {
+      "path": ".chrono-harness/state/origins/",
+      "disposition": "finish-dispose"
+    },
+    {
+      "path": ".chrono-harness/state/local/",
+      "disposition": "finish-dispose"
+    }
+  ],
+  "terminal_history": {
+    "keep_seconds": 86400,
+    "max_entries": 32,
+    "max_bytes": 4194304
+  },
+  "cache_history": {
+    "keep_seconds": 86400,
+    "max_entries": 32,
+    "max_bytes": 4194304
+  },
+  "main_cache_only": true
+}
