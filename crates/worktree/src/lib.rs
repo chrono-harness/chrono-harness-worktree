@@ -304,7 +304,7 @@ pub fn run(args: &[String]) -> CliOutput {
     if args == ["--version"] {
         return CliOutput {
             exit_code: 0,
-            stdout: "chrono-worktree 0.1.0\n".into(),
+            stdout: concat!("chrono-worktree ", env!("CARGO_PKG_VERSION"), "\n").into(),
             stderr: String::new(),
         };
     }

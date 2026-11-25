@@ -47,7 +47,8 @@ jobs:
           set -euo pipefail
           cargo build --release --locked --manifest-path crates/worktree/Cargo.toml
           binary="$CARGO_TARGET_DIR/release/chrono-worktree"
-          "$binary" --version | grep -Ex 'chrono-worktree [0-9]+[.][0-9]+[.][0-9]+'
+          version=${GITHUB_REF_NAME#v}
+          test "$("$binary" --version)" = "chrono-worktree ${version%%-*}"
           "$binary" --help | grep -F 'chrono-worktree start'
           mkdir "$RUNNER_TEMP/dist"
           cp "$CARGO_TARGET_DIR/release/chrono-worktree" "$RUNNER_TEMP/dist/chrono-worktree-$PLATFORM"
