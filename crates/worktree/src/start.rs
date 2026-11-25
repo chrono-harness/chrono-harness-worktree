@@ -468,10 +468,10 @@ pub(crate) fn cleanliness_at(
 pub(crate) fn exact_checkout(r: &mut Runner, target: &Path, tree: &str) -> Result<(), String> {
     let expected = r.tree(target, tree)?;
     let index = r.git(target, &["ls-files", "--stage", "-z"])?;
-    if !facts::checkout_changes(target, &expected, &index)?.is_empty() {
-        return Err(
-            "checkout differs from requested clean snapshot; preserve it for recovery".into(),
-        );
+    if let Some(path) = facts::checkout_changes(target, &expected, &index)?.first() {
+        return Err(format!(
+            "E_SNAPSHOT_DIRTY: index or working tree differs from the requested snapshot at {path:?}; preserve it for recovery"
+        ));
     }
     Ok(())
 }
@@ -495,12 +495,14 @@ pub(crate) fn untracked(r: &mut Runner, target: &Path, config: &Value) -> Result
     let observed: Vec<_> = paths(r.literal_inventory(target, &args)?)?
         .into_iter()
         .collect();
-    if !r
+    if let Some(path) = r
         .registration()?
         .nonartifact_paths(config, &observed)?
-        .is_empty()
+        .first()
     {
-        return Err("checkout has unregistered files; preserve it for recovery".into());
+        return Err(format!(
+            "E_SNAPSHOT_DIRTY: untracked path {path:?} is outside the registered artifact directories; preserve it for recovery"
+        ));
     }
     Ok(())
 }
