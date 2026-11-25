@@ -371,6 +371,35 @@ pub enum AdoptedPolicySource {
     RetainedTarget,
 }
 
+pub struct CleanupBinding<'a> {
+    pub token: &'a str,
+    pub report_path: &'a str,
+    pub checkout: &'a str,
+    pub branch: &'a str,
+    pub head: &'a str,
+    pub registry_digest: &'a str,
+}
+
+/// Match a published interrupted cleanup to the current terminal enrollment.
+pub fn binds_interrupted_cleanup(operation: &str, original: &CleanupBinding, expected: &CleanupBinding)
+    -> (bound: bool)
+    ensures bound <==> (operation@ == "cleanup"@
+        && original.token@ == expected.token@
+        && original.report_path@ == expected.report_path@
+        && original.checkout@ == expected.checkout@
+        && original.branch@ == expected.branch@
+        && original.head@ == expected.head@
+        && original.registry_digest@ == expected.registry_digest@),
+{
+    <&str>::exec_eq(operation, "cleanup")
+        && <&str>::exec_eq(original.token, expected.token)
+        && <&str>::exec_eq(original.report_path, expected.report_path)
+        && <&str>::exec_eq(original.checkout, expected.checkout)
+        && <&str>::exec_eq(original.branch, expected.branch)
+        && <&str>::exec_eq(original.head, expected.head)
+        && <&str>::exec_eq(original.registry_digest, expected.registry_digest)
+}
+
 pub struct ManagedUseBinding<'a> {
     pub schema: &'a str,
     pub checkout: &'a str,

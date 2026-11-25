@@ -12,6 +12,38 @@ use vstd::vpanic as panic;
 
 verus! {
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn interrupted_cleanup_requires_each_original_identity() {
+    broadcast use vstd::string::group_string_axioms;
+    proof {
+        reveal_strlit("cleanup"); assert("cleanup"@.len() == 7);
+        reveal_strlit("other-op"); assert("other-op"@.len() == 8);
+        reveal_strlit("different"); assert("different"@.len() == 9);
+        reveal_strlit("token"); assert("token"@.len() == 5);
+        reveal_strlit("path"); assert("path"@.len() == 4);
+        reveal_strlit("checkout"); assert("checkout"@.len() == 8);
+        reveal_strlit("branch"); assert("branch"@.len() == 6);
+        reveal_strlit("head"); assert("head"@.len() == 4);
+        reveal_strlit("registry"); assert("registry"@.len() == 8);
+    }
+    let expected = policy::CleanupBinding { token:"token", report_path:"path", checkout:"checkout",
+        branch:"branch", head:"head", registry_digest:"registry" };
+    expect(policy::binds_interrupted_cleanup("cleanup", &expected, &expected));
+    expect(!policy::binds_interrupted_cleanup("other-op", &expected, &expected));
+    let changed = policy::CleanupBinding { token:"different", ..expected };
+    expect(!policy::binds_interrupted_cleanup("cleanup", &changed, &expected));
+    let changed = policy::CleanupBinding { report_path:"different", ..expected };
+    expect(!policy::binds_interrupted_cleanup("cleanup", &changed, &expected));
+    let changed = policy::CleanupBinding { checkout:"different", ..expected };
+    expect(!policy::binds_interrupted_cleanup("cleanup", &changed, &expected));
+    let changed = policy::CleanupBinding { branch:"different", ..expected };
+    expect(!policy::binds_interrupted_cleanup("cleanup", &changed, &expected));
+    let changed = policy::CleanupBinding { head:"different", ..expected };
+    expect(!policy::binds_interrupted_cleanup("cleanup", &changed, &expected));
+    let changed = policy::CleanupBinding { registry_digest:"different", ..expected };
+    expect(!policy::binds_interrupted_cleanup("cleanup", &changed, &expected));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn only_a_successful_original_with_absence_verification_establishes_disposal() {
     broadcast use vstd::string::group_string_axioms;
     proof {
