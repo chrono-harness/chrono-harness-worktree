@@ -10,6 +10,14 @@ use vstd::vpanic as panic;
 verus! {
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn use_intent_uses_one_completed_operation_and_its_own_process() {
+    proof {
+        reveal_strlit(""); reveal_strlit("/checkout"); reveal_strlit("/other");
+        reveal_strlit("validate.delta"); reveal_strlit("other");
+        reveal_strlit("check.json"); reveal_strlit("another.json");
+        reveal_strlit("check.json.process"); reveal_strlit("another.process");
+        reveal_strlit("chrono-worktree-managed-use-intent/v2");
+        reveal_strlit("chrono-worktree-managed-use-result/v1");
+    }
     let intent = policy::ManagedUseBinding {
         schema: "chrono-worktree-managed-use-intent/v2", checkout: "/checkout",
         operation: "validate.delta", report_path: "check.json", process_path: "check.json.process",
