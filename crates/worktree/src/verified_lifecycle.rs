@@ -273,6 +273,65 @@ pub enum CleanupStage {
     Disposed,
 }
 
+
+/// History belongs to a finished checkout after all local responsibilities leave.
+pub fn terminal_history_ready(uses: usize, pending_report: bool, cache_only: bool,
+    artifacts_only: bool, cache_pending: Option<bool>) -> (ready: bool)
+    ensures ready == (uses == 0 && !pending_report && !cache_only && !artifacts_only
+        && cache_pending == Some(false)),
+{
+    uses == 0 && !pending_report && !cache_only && !artifacts_only
+        && matches!(cache_pending, Some(false))
+}
+
+/// Actual archive receipts can carry inline terminal facts or the older original.
+pub fn terminal_history_handoff(inline: Option<bool>, receipt_matches: bool,
+    original_matches: bool) -> (bound: bool)
+    ensures bound == (match inline {
+        Some(eq) => eq || receipt_matches,
+        None => receipt_matches && original_matches,
+    }),
+{
+    match inline {
+        Some(eq) => eq || receipt_matches,
+        None => receipt_matches && original_matches,
+    }
+}
+
+/// The recorded progress and the producer's reported effect must both establish disposal.
+pub fn terminal_history_result(handoff: bool, same_checkout: bool, same_head: bool,
+    disposed_progress: bool, same_receipt: bool, status: &str, removal: &str) -> (verified: bool)
+    ensures verified == (handoff && same_checkout && same_head && disposed_progress && same_receipt
+        && cleanup_stage(false,status@,removal@) == CleanupStage::Disposed),
+{
+    handoff && same_checkout && same_head && disposed_progress && same_receipt
+        && matches!(cleanup_result(false, status, removal), CleanupStage::Disposed)
+}
+
+pub struct CacheHistoryBinding {
+    pub receipt_matches: bool,
+    pub result_checkout_matches: bool,
+    pub result_generation_matches: bool,
+    pub result_intent_matches: bool,
+    pub intent_checkout_matches: bool,
+    pub intent_attachment_matches: bool,
+    pub intent_generation_matches: bool,
+    pub owner_matches: bool,
+}
+
+/// Cache rotation consumes both the original result and the intent for its generation.
+pub fn cache_history_result(binding: &CacheHistoryBinding, status: &str) -> (verified: bool)
+    ensures verified == (status@ == "cleaned"@ && binding.receipt_matches
+        && binding.result_checkout_matches && binding.result_generation_matches
+        && binding.result_intent_matches && binding.intent_checkout_matches
+        && binding.intent_attachment_matches && binding.intent_generation_matches && binding.owner_matches),
+{
+    <&str>::exec_eq(status,"cleaned") && binding.receipt_matches && binding.result_checkout_matches
+        && binding.result_generation_matches && binding.result_intent_matches
+        && binding.intent_checkout_matches && binding.intent_attachment_matches
+        && binding.intent_generation_matches && binding.owner_matches
+}
+
 pub open spec fn cleanup_stage(cache: bool, status: Seq<char>, removal: Seq<char>) -> CleanupStage {
     if status != "cleaned"@ { CleanupStage::Failed }
     else if cache { CleanupStage::CachesReleased }
