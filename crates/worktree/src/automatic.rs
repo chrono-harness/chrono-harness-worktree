@@ -2280,7 +2280,9 @@ impl Manager {
                 }
                 crate::verified_lifecycle::imported_policy_required(kind, e.has_adopted_policy())
             } else {
-                consumes_birth
+                // Main-cache identity and adopted policy already live in this entry.
+                // Its first command report has no separate enrollment reader.
+                !e.cache_only && consumes_birth
             };
             if consumes_enrollment
                 && (e.enrollment["receipt"]["source_root"].is_null()
@@ -4415,6 +4417,7 @@ impl Manager {
                     attempt.receipt.is_some(),
                     attempt.generation,
                     owner.generation,
+                    entry.cache_only && !owner.cache_pending,
                     true,
                     attempt.completed_at,
                     observed,
