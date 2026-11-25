@@ -59,10 +59,12 @@ pub use automatic_verification::{
 };
 
 #[cfg(not(verus_keep_ghost))]
-pub use crate::automatic::age::{age_preservation_required, age_window_passed, reusable_release};
+pub use crate::automatic::age::{
+    admits_age_policy, age_preservation_required, age_window_passed, reusable_release,
+};
 #[cfg(verus_keep_ghost)]
 pub use automatic_verification::age::{
-    age_preservation_required, age_window_passed, reusable_release,
+    admits_age_policy, age_preservation_required, age_window_passed, reusable_release,
 };
 
 #[cfg(not(verus_keep_ghost))]

@@ -5,6 +5,19 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 verus! {
+/// ASCII slash delimiting a Git branch namespace.
+pub const BRANCH_SEPARATOR: u8 = 47;
+
+/// An age policy must establish an ordered, nonzero window and a namespace for saved branches.
+pub fn admits_age_policy(kernel: bool, reuse_seconds: u64, delete_seconds: u64,
+    prefix: &[u8]) -> (admitted: bool)
+    ensures admitted <==> (kernel && 0 < reuse_seconds < delete_seconds
+        && prefix@.len() > 0 && prefix@.last() == BRANCH_SEPARATOR),
+{
+    kernel && reuse_seconds > 0 && reuse_seconds < delete_seconds
+        && !prefix.is_empty() && prefix[prefix.len() - 1] == BRANCH_SEPARATOR
+}
+
 /// Compare the physical checkout age with the configured whole-second window.
 pub fn age_window_passed(elapsed_nanos: u128, reuse_seconds: u64, delete_seconds: u64,
     deleting: bool) -> (passed: bool)
@@ -50,11 +63,12 @@ pub(super) struct AgePolicy {
 #[cfg(not(verus_keep_ghost))]
 impl AgePolicy {
     pub(super) fn validate(&self, kernel: bool) -> Result<(), String> {
-        if !kernel
-            || self.reuse_after_seconds == 0
-            || self.delete_after_seconds <= self.reuse_after_seconds
-            || !self.preserved_branch_prefix.ends_with('/')
-        {
+        if !admits_age_policy(
+            kernel,
+            self.reuse_after_seconds,
+            self.delete_after_seconds,
+            self.preserved_branch_prefix.as_bytes(),
+        ) {
             return Err(
                 "age policy requires kernel ownership, 0 < reuse < delete and a branch prefix"
                     .into(),
