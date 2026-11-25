@@ -60,7 +60,9 @@ mise run harness-setup
 
 先审查已有能力，再扩展。采用成熟、经过验证的软件工程方法，按 KISS、YAGNI、DRY 在现有负责位置简化、按需开发和复用。对照需求、当前 SPEC、实际使用方、已有能力和保留证据，核对职责归属、已登记依赖的影响，以及验证、CI 和存储成本。
 
-依次查本仓、固定版本的直接依赖和允许使用的外部来源，包括私有定义和仍有效的失败结论；核对接口、假设和适用范围。已有能力够用就复用。审查和测试限于实际风险与明确依赖；看不见不等于没有，考虑全局也不意味着每次都审查或测试全仓。
+依次查本仓、固定版本的直接依赖和允许使用的外部来源，包括私有定义和仍有效的失败结论；核对接口、假设和适用范围。审查和测试限于实际风险与明确依赖；看不见不等于没有，考虑全局也不意味着每次都审查或测试全仓。
+
+提出新工具、脚本、定时任务或验收项之前，先问“维持现状，谁的哪项明确需求会落空？”按实际配置核对平台已有行为。说不出具体缺口就停止这项提议，已开始的重复工作也应撤回。系统已自动滚动、过期或淘汰产物时，交由系统处理，无需额外轮换缓存键、安排清理或逐项追踪删除。只有明确需求超出现有能力，或实际故障影响使用方时，才处理具体缺口。
 
 ## registry.explicit
 
@@ -79,6 +81,8 @@ mise run harness-setup
 ## owner.canonical
 
 在真正负责的位置重构。定义、状态、输出和操作各自应有唯一权威来源和实际产生者。审查证实职责归属或耦合有问题时，先在那里重构，移除已经确认的冗余，再扩展；没有问题就不强制重构。局部改动应只需了解自身输入、接口和明确依赖。链接与别名要登记并指向真正来源。历史交给版本库；叙述和来源说明不能反过来决定程序依赖，也不能成为运行时权威。
+
+采用共享 AI 指令时，同一跨仓规则在相应指令库按 ID 维护。模板分发由所选规则生成的首读指南，宿主声明选择、工具、登记入口和独有约束。宿主启用了规则同步时，按该宿主登记的入口刷新指令，再读取生效的根指南。
 
 ## core.small-projects
 
@@ -147,22 +151,30 @@ mise run harness-setup
 在 GitHub 的 Issue、PR、评论和评审中记录实际动作或结果。先写给人看的正文，空一行，再在末尾追加以下三行。GitHub 页面显示中间的摘要，API 原文保留两个 HTML 注释及其中的关联 ID。事件也可单独成文。每行从第 1 列开始，字段顺序与空格固定，首尾使用同一个随机 event。
 
 ~~~text
-<!-- chrono-agent:v3 event=<event> session=<session> parent=<parent> task=<task> -->
-**Agent** `<agent>` · **action** `<action>` · **state** `<state>` · **target** `<target>`
-<!-- /chrono-agent:v3 event=<event> -->
+<!-- chrono-agent:v4 event=<event> parent=<parent> task=<task> -->
+**Agent** `<agent>` · **session** `<session>` · **model** `<model>` · **action** `<action>` · **state** `<state>` · **target** `<target>`
+<!-- /chrono-agent:v4 event=<event> -->
 ~~~
 
-agent 写实际运行时和任务路径，至少两段，每段符合 [a-z0-9][a-z0-9_-]*。session 是会话首次建立时随机生成的公开小写 UUIDv4，同会话的重试复用；fork 新建 session 并接收直接父会话的公开 UUID，根写 parent=-。task 是同一实际任务沿用的公开随机 UUIDv4，父子共同工作时传递它。另行委派的独立任务新建 task，其委派事件可用 target=task/<新任务 UUID>。event 每个新动作或状态变化生成独立的公开随机 UUIDv4；传输重送复用原事件和相同字段。UUID 必须为小写标准形式、版本 4、变体 8/9/a/b。session、parent、task 和 event 的 UUID 两两不同。只使用这些公开专用 ID。
+agent 写实际运行时和任务路径，至少两段，每段符合 [a-z0-9][a-z0-9_-]*。session 是会话首次建立时随机生成的公开小写 UUIDv4，同会话的重试复用；fork 新建 session 并接收直接父会话的公开 UUID，根写 parent=-。task 是同一实际任务沿用的公开随机 UUIDv4，父子共同工作时传递它。一个 task 可包含多个 session 和模型，同一 session 也可在事件之间切换模型。在可见摘要中写完整的公开专用 session UUID 和本次事件实际使用的模型 ID 或别名。model 符合 [A-Za-z0-9][A-Za-z0-9._/@:+-]*；运行时未提供实际型号时写 unknown。另行委派的独立任务新建 task，其委派事件可用 target=task/<新任务 UUID>。event 每个新动作或状态变化生成独立的公开随机 UUIDv4；传输重送复用原事件和相同字段。UUID 必须为小写标准形式、版本 4、变体 8/9/a/b。session、parent、task 和 event 的 UUID 两两不同。只使用这些公开专用 ID。
 
 action 取 task、delegate、issue、pr、review、push、ci.wait、check、build、test、release 之一。state 取 started、waiting、progress、blocked、succeeded、failed、cancelled 之一。target 取 self（本条正文所在的 GitHub 对象，适合编号未分配时）、task/<UUIDv4>、owner/repo#正整数、owner/repo@完整小写 Git OID（40 或 64 位）、owner/repo/run/正整数（可接 /attempt/正整数）或 owner/repo/tag/ASCII标签。开始、等待、解除阻塞、进展和结束时记录真实发生的转换，沿用同一 task、以不同 event 区分。等待完成通知时只发一次 waiting。成功/失败/取消结束该动作；新试验用新的事件陈述重试。保留乱序到达的每条观察，按 GitHub 原对象及创建时间组织，不以最后到达推断状态。相同 event 及内容只计一次，相同 event 内容冲突记为未知。
 
-用 chrono-instructions event-format 将八字段 JSON 写成 v3。event-read 从原始 GitHub 正文读取八字段 JSON，也能读取已发布的 v2。event-regex 输出 Python、PCRE2 和 JavaScript 可直接使用的三行正则，捕获组 1 到 8 依次为 event、session、parent、task、agent、action、state、target，末行反向引用第 1 组。读取器核对顶层 Markdown、唯一的末尾记录、UUID 独立性及首尾一致，接受 LF 或 CRLF 和一个可选末尾换行。引用、围栏及 HTML 示例中的内容按 Markdown 处理。缺失、无效、截断和歧义均记为未知。GitHub 提供作者账号，事件记录自报信息。复制整个记录能通过语法校验，身份和执行结果须分别核实。
+用 chrono-instructions event-format 将九字段 JSON 写成 v4，省略 model 时写 unknown。event-read 从 GitHub 原始正文读取九字段 JSON，也能读取已发布的 v3 和 v2，并为旧记录返回 model=unknown。event-regex 输出 Python、PCRE2 和 JavaScript 可直接使用的三行正则，捕获组 1 到 9 依次为 event、parent、task、agent、session、model、action、state、target，末行反向引用第 1 组。读取器核对顶层 Markdown、唯一的末尾记录、UUID 独立性及首尾一致，接受 LF 或 CRLF 和一个可选末尾换行。引用、围栏及 HTML 示例中的内容按 Markdown 处理。缺失、无效、截断和歧义均记为未知。GitHub 提供作者账号，事件记录自报信息。复制整个记录能通过语法校验，身份和执行结果须分别核实。
+
+## collaboration.github-contribution
+
+Issue 分类、工作分支命名、PR 标题、关联与关闭时机遵循本规则的完整说明。先读取负责仓登记的目标分支、标签、检查和交付要求。宿主可按本规则 ID 独立选择；工作事件另由 collaboration.github-agent-identity 定义。
+
+[GitHub 贡献约定](https://github.com/chrono-harness/chrono-harness-instructions/blob/dev/docs/contributing.md)
 
 ## candidate.landing
 
 小步完成交付，并确认实际落地。限制同时进行的工作，及时解决阻碍、合并符合验收的变更，不积压未交付 PR。按实际合并、发布和已验收范围报告进度。合并或发布后，要核对实际状态、落地 SHA、产物和必要的后续检查；提交、创建 PR、检查通过或状态为 CLOSED，都不能单独证明已交付。受验候选与落地树不同时，说明差异并核对受影响范围。生命周期由调用方负责时，要明确交接边界，不能把阶段完成说成已经交付。
 
 宿主默认并行验收、按依赖合并。独立 PR 不按编号或创建顺序排队，也不因目标分支单纯前移而强制追平、重建或重跑全部检查。GitHub 默认关闭 strict（要求分支追平），保留必需的汇总检查；PR 各作业检查同一个固定合并提交，以第一父提交为基线，并核对第二父提交是事件 head。目标分支 push 按完整 before／after 检查实际落地变化，不取消彼此独立的落地运行。真实冲突、有效输入或明确依赖变化时补验受影响范围；检查后并发合入产生的新树由落地检查检测并及时修复。这个默认方案不保证检查时与落地时严格同树；有此要求的发布或不可逆操作须另有明确、已验证的合并执行方案，不能把串行追平当成默认。
+
+宿主已采用可查询的 PR 提醒时，在开始任务和结束或交接前，通过登记入口查看自己尚未完成的 PR，按实际关联继续跟进或交接。
 
 ## artifact.results
 
