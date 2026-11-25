@@ -37,7 +37,7 @@ metadata=$(jq -ers --arg manifest "$(pwd -P)/$product" '
 filename=${metadata##*/}
 stem=${filename#lib}
 stem=${metadata%/*}/${stem%.rmeta}
-chrono-host-bootstrap check-compiler-sources native "$stem" src/verified_owner_publication.rs src/verified_lifecycle.rs src/maintenance.rs src/remote.rs \
+chrono-host-bootstrap check-compiler-sources native "$stem" src/facts.rs src/verified_owner_publication.rs src/verified_lifecycle.rs src/maintenance.rs src/remote.rs \
   src/check_inputs.rs src/check_inputs/observation_age.rs src/start.rs src/automatic.rs \
   src/automatic/owner_deployment.rs src/automatic/age.rs src/automatic/inventory.rs \
   src/automatic/migration.rs src/automatic/service.rs src/automatic/producer.rs \
