@@ -412,6 +412,40 @@ pub(crate) fn expect(actual: bool)
     if !actual { panic!(); }
 }
 
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn protected_drain_targets_require_ownership_and_a_cache_only_exception() {
+    use policy::DrainTarget::*;
+    broadcast use vstd::string::group_string_axioms;
+    proof {
+        reveal_strlit("active"); reveal_strlit("terminal");
+        assert("active"@.len() == 6 && "terminal"@.len() == 8);
+    }
+    expect(policy::active_cache("active", true));
+    expect(!policy::active_cache("active", false));
+    expect(!policy::active_cache("terminal", true));
+
+    expect(matches!(policy::drain_target(true, false, true, true, true), UnknownOwner));
+    expect(matches!(policy::drain_target(true, false, false, false, false), UnknownOwner));
+    expect(matches!(policy::drain_target(true, true, true, true, false), ExcludedPath));
+    expect(matches!(policy::drain_target(true, true, true, false, true), ExcludedPath));
+    expect(matches!(policy::drain_target(false, false, true, false, false), ExcludedPath));
+    expect(matches!(policy::drain_target(true, true, true, true, true), AcquireLease));
+    expect(matches!(policy::drain_target(true, true, false, false, false), AcquireLease));
+    expect(matches!(policy::drain_target(false, true, false, false, false), AcquireLease));
+    expect(matches!(policy::drain_target(false, false, false, false, false), Unowned));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn real_lease_result_and_unresolved_uses_control_drain() {
+    use policy::DrainLease::*;
+    expect(matches!(policy::drain_lease::<u64,u16>(Ok(Some(u64::MAX))), Held(value) if value == u64::MAX));
+    expect(matches!(policy::drain_lease::<u64,u16>(Ok(None)), Busy));
+    expect(matches!(policy::drain_lease::<u64,u16>(Err(51)), Failed(error) if error == 51));
+    expect(policy::drain_uses_released(0));
+    expect(!policy::drain_uses_released(1));
+    expect(!policy::drain_uses_released(usize::MAX));
+}
+
 fn expect_source(actual: policy::AdoptedPolicySource, expected: policy::AdoptedPolicySource)
     requires actual == expected,
 {

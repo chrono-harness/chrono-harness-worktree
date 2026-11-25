@@ -384,13 +384,19 @@ pub fn observed_cleanup_result(cache: bool, enrollment_status: &str,
     CleanupOutcome { cache: cache_outcome, cleaned, stage }
 }
 
+pub fn active_cache(status: &str, pending: bool) -> (active: bool)
+    ensures active == (status@ == "active"@ && pending),
+{
+    <&str>::exec_eq(status, "active") && pending
+}
+
 pub fn select_cleanup(status: &str, cache_pending: bool, maintenance: bool, artifacts_only: bool) -> (selected: bool)
     ensures selected <==> (status@ == "terminal"@
         || (status@ == "active"@ && cache_pending)
         || (status@ == "retained"@ && maintenance && !artifacts_only)),
 {
     <&str>::exec_eq(status, "terminal")
-        || (<&str>::exec_eq(status, "active") && cache_pending)
+        || active_cache(status, cache_pending)
         || (<&str>::exec_eq(status, "retained") && maintenance && !artifacts_only)
 }
 
@@ -402,6 +408,45 @@ pub fn select_drain(status: &str, cache_pending: bool, maintenance: bool,
         || (status@ == "retained"@ && maintenance && !artifacts_only)),
 {
     age_due || select_cleanup(status, cache_pending, maintenance, artifacts_only)
+}
+
+
+pub enum DrainTarget { UnknownOwner, ExcludedPath, AcquireLease, Unowned }
+
+/// An excluded checkout can only release an active pending cache in cache-only mode.
+pub fn drain_target(kernel: bool, owned: bool, excluded: bool, active_cache: bool, cache_only: bool)
+    -> (target: DrainTarget)
+    ensures target == (if kernel && !owned { DrainTarget::UnknownOwner }
+        else if excluded && !(active_cache && cache_only) { DrainTarget::ExcludedPath }
+        else if owned { DrainTarget::AcquireLease } else { DrainTarget::Unowned }),
+{
+    if kernel && !owned { DrainTarget::UnknownOwner }
+    else if excluded && !(active_cache && cache_only) { DrainTarget::ExcludedPath }
+    else if owned { DrainTarget::AcquireLease }
+    else { DrainTarget::Unowned }
+}
+
+pub enum DrainLease<L, E> { Held(L), Busy, Failed(E) }
+
+/// Preserve the real capability or acquisition error from the kernel adapter.
+pub fn drain_lease<L, E>(observation: Result<Option<L>, E>) -> (lease: DrainLease<L,E>)
+    ensures lease == (match observation {
+        Ok(Some(held)) => DrainLease::Held(held),
+        Ok(None) => DrainLease::Busy,
+        Err(error) => DrainLease::Failed(error),
+    }),
+{
+    match observation {
+        Ok(Some(held)) => DrainLease::Held(held),
+        Ok(None) => DrainLease::Busy,
+        Err(error) => DrainLease::Failed(error),
+    }
+}
+
+pub fn drain_uses_released(remaining: usize) -> (released: bool)
+    ensures released == (remaining == 0),
+{
+    remaining == 0
 }
 
 pub fn retain_evidence(disposal_authorized: bool, evidence_present: bool) -> (retain: bool)
