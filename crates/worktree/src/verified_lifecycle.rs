@@ -317,6 +317,36 @@ pub enum AdoptedPolicySource {
     RetainedTarget,
 }
 
+pub struct ManagedUseBinding<'a> {
+    pub schema: &'a str,
+    pub checkout: &'a str,
+    pub operation: &'a str,
+    pub report_path: &'a str,
+    pub process_path: &'a str,
+    pub joined: bool,
+}
+
+pub fn binds_use_intent(intent: &ManagedUseBinding, result: &ManagedUseBinding,
+    report_path: &str, process_path: &str) -> (bound: bool)
+    ensures bound <==> (intent.schema@ == "chrono-worktree-managed-use-intent/v2"@
+        && result.schema@ == "chrono-worktree-managed-use-result/v1"@
+        && !intent.joined && result.joined
+        && intent.checkout@ != ""@ && intent.checkout@ == result.checkout@
+        && intent.operation@ != ""@ && intent.operation@ == result.operation@
+        && intent.report_path@ == report_path@ && result.report_path@ == report_path@
+        && intent.process_path@ == process_path@ && result.process_path@ == process_path@),
+{
+    <&str>::exec_eq(intent.schema, "chrono-worktree-managed-use-intent/v2")
+        && <&str>::exec_eq(result.schema, "chrono-worktree-managed-use-result/v1")
+        && !intent.joined && result.joined
+        && !<&str>::exec_eq(intent.checkout, "") && <&str>::exec_eq(intent.checkout, result.checkout)
+        && !<&str>::exec_eq(intent.operation, "") && <&str>::exec_eq(intent.operation, result.operation)
+        && <&str>::exec_eq(intent.report_path, report_path)
+        && <&str>::exec_eq(result.report_path, report_path)
+        && <&str>::exec_eq(intent.process_path, process_path)
+        && <&str>::exec_eq(result.process_path, process_path)
+}
+
 pub fn needs_enrollment_report(cache_only: bool, pending_use: bool, pending_handoff: bool) -> (needed: bool)
     ensures needed == (!cache_only || pending_use || pending_handoff),
 {

@@ -9,6 +9,44 @@ use vstd::vpanic as panic;
 
 verus! {
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn use_intent_uses_one_completed_operation_and_its_own_process() {
+    proof {
+        reveal_strlit(""); reveal_strlit("/checkout"); reveal_strlit("/other");
+        reveal_strlit("validate.delta"); reveal_strlit("other");
+        reveal_strlit("check.json"); reveal_strlit("another.json");
+        reveal_strlit("check.json.process"); reveal_strlit("another.process");
+        reveal_strlit("chrono-worktree-managed-use-intent/v2");
+        reveal_strlit("chrono-worktree-managed-use-result/v1");
+        assert("/checkout"@.len() != ""@.len() && "validate.delta"@.len() != ""@.len());
+        assert("/checkout"@.len() != "/other"@.len() && "validate.delta"@.len() != "other"@.len());
+        assert("check.json"@.len() != "another.json"@.len());
+        assert("check.json.process"@.len() != "another.process"@.len());
+
+    }
+    let intent = policy::ManagedUseBinding {
+        schema: "chrono-worktree-managed-use-intent/v2", checkout: "/checkout",
+        operation: "validate.delta", report_path: "check.json", process_path: "check.json.process",
+        joined: false,
+    };
+    let result = policy::ManagedUseBinding {
+        schema: "chrono-worktree-managed-use-result/v1", joined: true, ..intent
+    };
+    expect(policy::binds_use_intent(&intent, &result, "check.json", "check.json.process"));
+    expect(!policy::binds_use_intent(&result, &intent, "check.json", "check.json.process"));
+    let incomplete = policy::ManagedUseBinding { joined: false, ..result };
+    expect(!policy::binds_use_intent(&intent, &incomplete, "check.json", "check.json.process"));
+    let other = policy::ManagedUseBinding { checkout: "/other", ..result };
+    expect(!policy::binds_use_intent(&intent, &other, "check.json", "check.json.process"));
+    let different = policy::ManagedUseBinding { operation: "other", ..result };
+    expect(!policy::binds_use_intent(&intent, &different, "check.json", "check.json.process"));
+    let empty = policy::ManagedUseBinding { operation: "", ..intent };
+    let missing = policy::ManagedUseBinding { operation: "", ..result };
+    expect(!policy::binds_use_intent(&empty, &missing, "check.json", "check.json.process"));
+    expect(!policy::binds_use_intent(&intent, &result, "another.json", "check.json.process"));
+    expect(!policy::binds_use_intent(&intent, &result, "check.json", "another.process"));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn terminal_history_keeps_unknown_future_live_and_unexpired_records() {
     let boundary = policy::retire_history(true, true, Some(100), 110, 10, false);
     let young = policy::retire_history(true, true, Some(100), 109, 10, false);

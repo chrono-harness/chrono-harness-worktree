@@ -66,6 +66,18 @@ fn recognized_report(root: &Path, prefix: &str, name: &str, token: &str, value: 
             .is_some_and(|op| token.strip_prefix(op).is_some_and(|s| s.starts_with('-')))
 }
 
+fn use_binding(value: &Value) -> Option<crate::verified_lifecycle::ManagedUseBinding<'_>> {
+    let process = &value["managed_process_original"];
+    Some(crate::verified_lifecycle::ManagedUseBinding {
+        schema: value["schema"].as_str()?,
+        checkout: value["path"].as_str()?,
+        operation: value["operation"].as_str()?,
+        report_path: value["report_path"].as_str()?,
+        process_path: process["path"].as_str()?,
+        joined: process["joined"].as_bool()?,
+    })
+}
+
 /// A sidecar has the report's actual receipt, or its own identity-bound operation record.
 /// Undeclared foreign files in either business directory never enter the disposal set.
 fn related_file(
@@ -134,15 +146,18 @@ fn related_file(
             return Ok(false);
         }
         let original = crate::document::json(&bytes)?;
-        return Ok(value["schema"] == "chrono-worktree-managed-use-intent/v2"
-            && original["schema"] == "chrono-worktree-managed-use-result/v1"
-            && original["report_path"] == report_path
-            && value["report_path"] == report_path
-            && value["path"] == original["path"]
-            && value["operation"] == original["operation"]
-            && original["managed_process_original"] == report["managed_process_original"]
-            && value["managed_process_original"]["path"]
-                == original["managed_process_original"]["path"]);
+        let (Some(intent), Some(completed)) = (use_binding(&value), use_binding(&original)) else {
+            return Ok(false);
+        };
+        return Ok(
+            original["managed_process_original"] == report["managed_process_original"]
+                && crate::verified_lifecycle::binds_use_intent(
+                    &intent,
+                    &completed,
+                    report_path,
+                    &format!("{report_path}.process"),
+                ),
+        );
     }
     if value["report_path"] == report_path
         && value["source_root"] == value!(root)
