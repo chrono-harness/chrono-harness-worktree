@@ -17,6 +17,11 @@ fn use_intent_uses_one_completed_operation_and_its_own_process() {
         reveal_strlit("check.json.process"); reveal_strlit("another.process");
         reveal_strlit("chrono-worktree-managed-use-intent/v2");
         reveal_strlit("chrono-worktree-managed-use-result/v1");
+        assert("/checkout"@.len() != ""@.len() && "validate.delta"@.len() != ""@.len());
+        assert("/checkout"@.len() != "/other"@.len() && "validate.delta"@.len() != "other"@.len());
+        assert("check.json"@.len() != "another.json"@.len());
+        assert("check.json.process"@.len() != "another.process"@.len());
+
     }
     let intent = policy::ManagedUseBinding {
         schema: "chrono-worktree-managed-use-intent/v2", checkout: "/checkout",
