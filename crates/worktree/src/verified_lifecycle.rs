@@ -27,9 +27,15 @@ pub use maintenance_verification::{removed_checkout, retained_reference_ancestor
 #[path = "check_inputs.rs"]
 mod check_inputs;
 #[cfg(not(verus_keep_ghost))]
-pub use crate::check_inputs::{accepts_input_entry, full_paths_distinct};
+pub use crate::check_inputs::{
+    accepts_input_entry, dedicated_input_path, full_paths_distinct, unchanged_input,
+};
 #[cfg(verus_keep_ghost)]
-pub use check_inputs::{accepts_input_entry, full_paths_distinct};
+pub use check_inputs::usable_input_component;
+#[cfg(verus_keep_ghost)]
+pub use check_inputs::{
+    accepts_input_entry, dedicated_input_path, full_paths_distinct, unchanged_input,
+};
 
 #[cfg(verus_keep_ghost)]
 #[path = "start.rs"]

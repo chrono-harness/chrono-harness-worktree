@@ -22,6 +22,10 @@ name = "verified_owner_publication"
 path = "tests/verified_owner_publication.rs"
 
 [[test]]
+name = "check_inputs"
+path = "tests/proof_support/worktree/check_inputs.rs"
+
+[[test]]
 name = "observation_age"
 path = "tests/observation_age.rs"
 
