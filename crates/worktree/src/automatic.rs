@@ -143,6 +143,15 @@ pub fn publish_enrollment_record<S, B, W, A>(initial: S, grows: bool,
     out
 }
 
+/// The custodian may seal partial bytes after a producer dies. Their length
+/// or storage state cannot turn them into the producer's returned report.
+pub fn unfinished_cleanup_publication(sealed: bool, interrupted: bool, unknown: bool,
+    returned: bool) -> (unfinished: bool)
+    ensures unfinished == (!sealed || (interrupted && unknown && !returned)),
+{
+    !sealed || (interrupted && unknown && !returned)
+}
+
 /// Only explicit maintenance with the original exclusion probes a missing cache.
 pub fn absence_probe_required(maintenance: bool, cache_pending: bool, excluded: bool)
     -> (required: bool)
@@ -2512,6 +2521,19 @@ impl Manager {
             if attempt.path != format!("{}{}.json", config.report_directory, attempt.token) {
                 return Err("cleanup result path differs from its recorded invocation".into());
             }
+            // A producer may have been interrupted after reserving the
+            // address but before sealing its report. The next cleanup checks
+            // that intent and the actual Git state under the worktree lease.
+            let source = inventory.producer_status("lifecycle-original", &attempt.path)?;
+            if source["records"].as_array().is_some_and(|records| {
+                matches!(records.as_slice(), [record] if record["sealed"].as_bool().is_some_and(|sealed|
+                    unfinished_cleanup_publication(sealed,
+                        record["outcome"]["publication"] == "interrupted",
+                        record["outcome"]["completion"] == "not-established",
+                        !record["observed_return"].is_null())))
+            }) {
+                continue;
+            }
             let _input = crate::retention::consumer_read_guard(&root, &attempt.path, &role)?;
             let bytes =
                 crate::recovery::state_bytes_for_consumer(&root, &attempt.path, Some(&role))?;
@@ -4243,7 +4265,7 @@ impl Manager {
                     } else if cache {
                         self.execute_cache(r, i, token, attempt, false)
                     } else {
-                        self.execute_entry(r, i, token, attempt)
+                        self.execute_entry(r, i, token, attempt, _lease.as_ref())
                     }
                 },
             );
@@ -4675,6 +4697,7 @@ impl Manager {
         i: usize,
         token: &str,
         report: &mut Value,
+        lease: Option<&Lease>,
     ) -> Result<(), String> {
         if !self.ledger.entries[i].enrollment["age_retirement"].is_null() {
             return self.execute_age_retirement(r, i, token, report);
@@ -4699,10 +4722,55 @@ impl Manager {
         self.stable(r)?;
         self.pinned_retention(r, &t)?;
         if let Some(prior) = e.attempts.last() {
-            let receipt = prior
-                .receipt
-                .as_ref()
-                .ok_or("interrupted cleanup has no original result; explicit recovery required")?;
+            let root = &self.inputs.policy.coordinator_root;
+            let interrupted = if prior.receipt.is_none() {
+                lease
+                    .ok_or("interrupted cleanup requires the enrolled worktree's exclusive lease")?
+                    .stable()?;
+                let intent = format!("{}.intent.json", prior.path);
+                let bytes = crate::recovery::state_bytes(root, &intent)?;
+                let digest = sha256(&bytes);
+                let inventory = crate::retention::Inventory::adopted(root)?
+                    .ok_or("interrupted cleanup intent has no enrolled producer")?;
+                if !inventory.published_original(&intent, &digest, bytes.len() as u64)? {
+                    return Err("interrupted cleanup intent is not sealed".into());
+                }
+                let expected = match crate::recovery::original_bytes(root, &prior.path)? {
+                    Some(bytes) => crate::recovery::ExpectedResult::Present {
+                        sha256: sha256(&bytes),
+                    },
+                    None => crate::recovery::ExpectedResult::Absent {},
+                };
+                let evidence = crate::recovery::inspect(
+                    root,
+                    &self.inputs.config_path,
+                    &self.inputs.anchor_config_bytes,
+                    &intent,
+                    &digest,
+                    &expected,
+                    report,
+                )?;
+                let binding = &evidence.descriptor;
+                if binding["operation"] != "cleanup"
+                    || binding["lock_reason"] != prior.token
+                    || binding["report_path"] != prior.path
+                    || binding["destination"] != value!(e.path)
+                    || binding["branch_ref"] != e.current_branch()
+                    || binding["base"] != t.head
+                    || binding["registry_digest"] != report["registry_digest"]
+                {
+                    return Err(
+                        "interrupted cleanup intent differs from its terminal enrollment".into(),
+                    );
+                }
+                if retirement::absent(&e.path)? {
+                    self.check_absent_enrollment(&e, &r.inventory(root)?)?;
+                }
+                evidence.stable()?;
+                Some(evidence)
+            } else {
+                None
+            };
             if e.path.exists() {
                 let locked = r
                     .inventory(&self.inputs.policy.coordinator_root)?
@@ -4710,26 +4778,44 @@ impl Manager {
                     .find(|row| row.get("worktree").is_some_and(|p| Path::new(p) == e.path))
                     .and_then(|row| row.get("locked").cloned());
                 if locked.as_deref() == Some(prior.token.as_str()) {
-                    let b = self.receipt(receipt)?;
-                    let prior_report = json(&b)?;
                     self.check_entry(r, &e, &t.head, Some(&prior.token))?;
                     let tree = r.oid(&e.path, &format!("{}^{{tree}}", t.head))?;
-                    maintenance::release_reconciled(
-                        r,
-                        &self.inputs.policy.coordinator_root,
-                        report,
-                        &prior_report,
-                        &t.head,
-                        &tree,
-                        || self.receipt(receipt).map(|_| ()),
-                    )?;
+                    let source = match (&prior.receipt, &interrupted) {
+                        (Some(receipt), None) => {
+                            let original = json(&self.receipt(receipt)?)?;
+                            maintenance::release_reconciled(
+                                r,
+                                root,
+                                report,
+                                &original,
+                                &t.head,
+                                &tree,
+                                || self.receipt(receipt).map(|_| ()),
+                            )?;
+                            value!(receipt)
+                        }
+                        (None, Some(evidence)) => {
+                            maintenance::release_reconciled(
+                                r,
+                                root,
+                                report,
+                                &evidence.descriptor,
+                                &t.head,
+                                &tree,
+                                || evidence.stable(),
+                            )?;
+                            value!({"path":report["prior_intent"]["path"],
+                                "sha256":report["prior_intent"]["sha256"]})
+                        }
+                        _ => return Err("prior cleanup evidence unavailable".into()),
+                    };
                     // The new original receives the established recovery facts.
                     // The old address describes their source, not another
                     // runtime dependency on all prior cleanup attempts.
                     report["cleanup_lock_recovery"] = value!({
                         "schema":"chrono-worktree-cleanup-lock-handoff/v1",
                         "source_root":self.inputs.policy.coordinator_root,
-                        "source":receipt,"lock_reason":prior.token,
+                        "source":source,"lock_reason":prior.token,
                         "path":e.path,"attachment":e.attachment,
                         "head":t.head,"index_tree":tree,
                         "handoff":"prior-lock-released-under-original-exclusion"

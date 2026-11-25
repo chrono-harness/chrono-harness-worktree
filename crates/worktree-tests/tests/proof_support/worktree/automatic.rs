@@ -46,6 +46,16 @@ fn require_absence_expectation(actual: bool)
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn interrupted_cleanup_custody_never_claims_a_producer_return() {
+    require_absence_expectation(absence_policy::unfinished_cleanup_publication(false, false, false, false));
+    require_absence_expectation(absence_policy::unfinished_cleanup_publication(true, true, true, false));
+    require_absence_expectation(!absence_policy::unfinished_cleanup_publication(true, true, true, true));
+    require_absence_expectation(!absence_policy::unfinished_cleanup_publication(true, true, false, false));
+    require_absence_expectation(!absence_policy::unfinished_cleanup_publication(true, false, true, false));
+    require_absence_expectation(!absence_policy::unfinished_cleanup_publication(true, false, false, true));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn cleanup_attempt_selection_keeps_unknown_age_and_current_responsibilities() {
     require_absence_expectation(!absence_policy::retain_cleanup_attempt(false, false, false));
     require_absence_expectation(absence_policy::retain_cleanup_attempt(false, false, true));
