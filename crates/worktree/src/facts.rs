@@ -208,17 +208,14 @@ pub fn checkout_changes(root: &Path, expected: &Tree, index: &[u8]) -> Result<Ve
     for row in records(index)? {
         let ([mode, oid, stage], path) = fields(row, "index")?;
         full_oid(oid)?;
-        if !matches!(stage, "0" | "1" | "2" | "3") {
-            return Err("invalid Git index stage".into());
-        }
+        let tree = expected
+            .get(path)
+            .map(|entry| (entry.mode.as_str(), entry.oid.as_str()));
+        let differs = crate::verified_lifecycle::index_entry_changed(stage, mode, oid, tree)?;
         if !stages.insert((path, stage)) {
             return Err("duplicate Git index stage".into());
         }
-        if stage != "0"
-            || expected
-                .get(path)
-                .is_none_or(|entry| entry.mode != mode || entry.oid != oid)
-        {
+        if differs {
             changed.insert(path.to_owned());
         }
     }

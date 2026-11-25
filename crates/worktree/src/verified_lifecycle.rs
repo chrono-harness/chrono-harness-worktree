@@ -144,6 +144,36 @@ pub use cli_status_owner::successful_report_status;
 
 verus! {
 
+/// Classify one Git index row against the commit whose checkout is being cleaned.
+pub fn index_entry_changed(stage: &str, mode: &str, oid: &str, expected: Option<(&str, &str)>)
+    -> (out: Result<bool, &'static str>)
+    ensures
+        if stage@ == "0"@ {
+            match expected {
+                Some((tree_mode, tree_oid)) => out == Ok::<bool, &str>(
+                    mode@ != tree_mode@ || oid@ != tree_oid@),
+                None => out == Ok::<bool, &str>(true),
+            }
+        } else if stage@ == "1"@ || stage@ == "2"@ || stage@ == "3"@ {
+            out == Ok::<bool, &str>(true)
+        } else {
+            out.is_err() && out->Err_0@ == "invalid Git index stage"@
+        },
+{
+    if <&str>::exec_eq(stage, "0") {
+        Ok(match expected {
+            Some((tree_mode, tree_oid)) => !<&str>::exec_eq(mode, tree_mode)
+                || !<&str>::exec_eq(oid, tree_oid),
+            None => true,
+        })
+    } else if <&str>::exec_eq(stage, "1") || <&str>::exec_eq(stage, "2")
+        || <&str>::exec_eq(stage, "3") {
+        Ok(true)
+    } else {
+        Err("invalid Git index stage")
+    }
+}
+
 pub enum ObservationAgeReply { Fresh, Stale, Diagnostic, Invalid }
 
 pub fn observation_age_reply(exit: i32, stdout_empty: bool, message_empty: bool,

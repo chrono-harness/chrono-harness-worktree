@@ -475,6 +475,42 @@ fn qualified_expiry_releases_reusable_outputs_without_finishing_work() {
     expect(policy::reusable_release(false, true, u64::MAX, None));
 }
 
+fn expect_index_change(actual: Result<bool, &str>, changed: bool)
+    requires actual == Ok::<bool, &str>(changed),
+{
+    match actual { Ok(value) => expect(value == changed), Err(_) => expect(false) }
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn index_classification_preserves_staged_work() {
+    proof {
+        reveal_strlit("100644"); reveal_strlit("100755");
+        reveal_strlit("blob-one"); reveal_strlit("blob-two");
+        assert("100644"@[3] != "100755"@[3]);
+        assert("blob-one"@[5] != "blob-two"@[5]);
+        reveal_strlit("0"); reveal_strlit("1"); reveal_strlit("2"); reveal_strlit("3"); reveal_strlit("4");
+        assert("1"@[0] != "0"@[0]);
+        assert("2"@[0] != "0"@[0]);
+        assert("3"@[0] != "0"@[0]);
+        assert("4"@[0] != "0"@[0]);
+        assert("4"@[0] != "1"@[0]);
+        assert("4"@[0] != "2"@[0]);
+        assert("4"@[0] != "3"@[0]);
+    }
+    let tree_entry = Some(("100644", "blob-one"));
+    expect_index_change(policy::index_entry_changed("0", "100644", "blob-one", tree_entry), false);
+    expect_index_change(policy::index_entry_changed("0", "100755", "blob-one", tree_entry), true);
+    expect_index_change(policy::index_entry_changed("0", "100644", "blob-two", tree_entry), true);
+    expect_index_change(policy::index_entry_changed("0", "100644", "blob-one", None), true);
+    expect_index_change(policy::index_entry_changed("1", "100644", "blob-one", tree_entry), true);
+    expect_index_change(policy::index_entry_changed("2", "100644", "blob-one", tree_entry), true);
+    expect_index_change(policy::index_entry_changed("3", "100644", "blob-one", tree_entry), true);
+    match policy::index_entry_changed("4", "100644", "blob-one", tree_entry) {
+        Err(message) => expect(<&str>::exec_eq(message, "invalid Git index stage")),
+        Ok(_) => expect(false),
+    }
+}
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn retained_reference_recovery_queries_only_permitted_advances() {
     match policy::retained_reference_ancestor_required(true, false) {
