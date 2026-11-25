@@ -679,6 +679,21 @@ fn expired_active_enrollment_is_selected(elapsed_nanos: u128, reuse: u64, delete
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn age_policy_requires_kernel_ownership_ordered_windows_and_a_trailing_slash() {
+    let saved: [u8; 2] = [114, 47];
+    let unterminated: [u8; 1] = [114];
+    let empty: [u8; 0] = [];
+    expect(policy::admits_age_policy(true, 1, 2, &saved));
+    expect(policy::admits_age_policy(true, u64::MAX - 1, u64::MAX, &saved));
+    expect(!policy::admits_age_policy(false, 1, 2, &saved));
+    expect(!policy::admits_age_policy(true, 0, 2, &saved));
+    expect(!policy::admits_age_policy(true, 2, 2, &saved));
+    expect(!policy::admits_age_policy(true, 3, 2, &saved));
+    expect(!policy::admits_age_policy(true, 1, 2, &unterminated));
+    expect(!policy::admits_age_policy(true, 1, 2, &empty));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn observation_at_the_threshold_waits_and_one_nanosecond_later_is_due() {
     let on_reuse = policy::age_window_passed(23_000_000_000, 23, 24, false);
     let past_reuse = policy::age_window_passed(23_000_000_001, 23, 24, false);
