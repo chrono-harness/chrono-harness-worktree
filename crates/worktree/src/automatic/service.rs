@@ -423,7 +423,44 @@ fn linked_retention_status(
         return Ok("no-current-enrollment");
     };
     let head = r.oid(path, "HEAD")?;
-    owner.check_attachment(r, &owner.ledger.entries[index], &head, None)?;
+    let entry = &owner.ledger.entries[index];
+    if let Err(unlocked_error) = owner.check_attachment(r, entry, &head, None) {
+        // A failed terminal disposal keeps its Git lock for the next recovery.
+        // The same enrolled checkout still needs its own retention sweep.
+        let Some(terminal) = entry.terminal.as_ref().filter(|t| t.head == head) else {
+            return Err(unlocked_error);
+        };
+        let Some(attempt) = entry.attempts.last() else {
+            return Err(unlocked_error);
+        };
+        let Some(receipt) = &attempt.receipt else {
+            return Err(unlocked_error);
+        };
+        let original = crate::document::decode::<Value>(&owner.receipt(receipt)?)?;
+        let terminal_matches = if let Some(handoff) = original.get("terminal_handoff") {
+            entry.terminal_handoff()?.as_ref() == Some(handoff)
+        } else {
+            original["terminal_receipt"] == value!(terminal.receipt)
+        };
+        if receipt.path != attempt.path
+            || original["schema"] != "chrono-worktree-report/v1"
+            || original["operation"] != "cleanup"
+            || original["status"] != "failed"
+            || original["automatic_cleanup"] != true
+            || original["source_root"] != value!(inputs.policy.coordinator_root)
+            || original["config_path"] != inputs.config_path
+            || original["destination"] != value!(path)
+            || original["branch_ref"] != entry.current_branch()
+            || original["base"] != head
+            || original["head"] != head
+            || original["report_path"] != attempt.path
+            || original["lock_reason"] != attempt.token
+            || !terminal_matches
+        {
+            return Err(unlocked_error);
+        }
+        owner.check_attachment(r, entry, &head, Some(&attempt.token))?;
+    }
     Ok("ready")
 }
 

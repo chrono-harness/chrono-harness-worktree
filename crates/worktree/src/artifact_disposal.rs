@@ -228,6 +228,7 @@ pub(crate) fn dispose(
         Ok(m) if m.is_dir() => Ok("attempted-unverified"),
         Ok(_) => Err(format!("disposal requires a physical directory: {name}")),
     };
+    let mut retained = Vec::new();
     for (name, path) in names.iter().zip(paths) {
         no_symlink_parents(target, name.trim_end_matches('/'))?;
         let mut observed = state(path, name)?;
@@ -260,7 +261,20 @@ pub(crate) fn dispose(
         if observed == "already-absent" {
             continue;
         }
-        let _retention = crate::removal::Guard::one(target, name.trim_end_matches('/'))?;
+        let _retention = match crate::removal::Guard::one(target, name.trim_end_matches('/')) {
+            Ok(guard) => guard,
+            Err(error) => {
+                let effect = report["artifact_disposals"]
+                    .as_array_mut()
+                    .unwrap()
+                    .last_mut()
+                    .unwrap();
+                effect["status"] = json!("preserved");
+                effect["error"] = json!(error);
+                retained.push(format!("{name}: {error}"));
+                continue;
+            }
+        };
         if let Some(retention) = &_retention {
             retention.stable()?;
         }
@@ -302,5 +316,9 @@ pub(crate) fn dispose(
             effect["footprint_after"] = json!(artifact_footprint(path)?);
         }
     }
-    Ok(())
+    if retained.is_empty() {
+        Ok(())
+    } else {
+        Err(retained.join("; "))
+    }
 }
