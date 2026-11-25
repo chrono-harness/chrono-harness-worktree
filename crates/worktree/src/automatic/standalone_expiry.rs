@@ -104,7 +104,46 @@ fn related_file(
     {
         return Ok(false);
     }
+    for binding in [
+        "managed_use_receipt",
+        "managed_use_intent",
+        "main_cache_release",
+        "cache_intent",
+        "terminal_receipt",
+    ] {
+        if report[binding]["path"] == path {
+            return Ok(report[binding]["sha256"].as_str().is_some_and(|digest| {
+                crate::document::file_identity(&p).is_ok_and(|(hash, _)| hash == digest)
+            }));
+        }
+    }
     let value = crate::document::json(&fs::read(&p).map_err(|e| e.to_string())?)?;
+    if path == format!("{state}use-intent-{name}") {
+        let result = &report["managed_use_receipt"];
+        let result_path = format!("{state}use-{name}");
+        if result["path"] != result_path || report["managed_process_original"]["joined"] != true {
+            return Ok(false);
+        }
+        let result_file = no_symlink_parents(root, &result_path)?;
+        let bytes = match fs::read(&result_file) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error.to_string()),
+        };
+        if result["sha256"] != crate::document::sha256(&bytes) {
+            return Ok(false);
+        }
+        let original = crate::document::json(&bytes)?;
+        return Ok(value["schema"] == "chrono-worktree-managed-use-intent/v2"
+            && original["schema"] == "chrono-worktree-managed-use-result/v1"
+            && original["report_path"] == report_path
+            && value["report_path"] == report_path
+            && value["path"] == original["path"]
+            && value["operation"] == original["operation"]
+            && original["managed_process_original"] == report["managed_process_original"]
+            && value["managed_process_original"]["path"]
+                == original["managed_process_original"]["path"]);
+    }
     if value["report_path"] == report_path
         && value["source_root"] == value!(root)
         && value["schema"]
@@ -112,13 +151,6 @@ fn related_file(
             .is_some_and(|s| s.starts_with("chrono-worktree-"))
     {
         return Ok(true);
-    }
-    if report["terminal_receipt"]["path"] == path {
-        return Ok(report["terminal_receipt"]["sha256"]
-            .as_str()
-            .is_some_and(|digest| {
-                crate::document::file_identity(&p).is_ok_and(|(hash, _)| hash == digest)
-            }));
     }
     Ok(false)
 }
@@ -255,6 +287,11 @@ fn expire_locked(
             continue;
         }
         let mut dependencies = crate::recovery::original_paths(root, &report)?;
+        if report["managed_use_intent"].is_null()
+            && report["managed_use_receipt"]["path"].is_string()
+        {
+            dependencies.push(format!("{state}use-intent-{name}"));
+        }
         let birth = format!("{state}birth-{name}");
         if root.join(&birth).try_exists().map_err(|e| e.to_string())? {
             dependencies.push(birth);

@@ -2280,7 +2280,14 @@ impl Manager {
                 }
                 crate::verified_lifecycle::imported_policy_required(kind, e.has_adopted_policy())
             } else {
+                // Main-cache identity and adopted policy already live in this entry.
+                // Its first command report has no separate enrollment reader.
                 consumes_birth
+                    && crate::verified_lifecycle::needs_enrollment_report(
+                        e.cache_only,
+                        !e.uses.is_empty(),
+                        e.report_handoff_pending(),
+                    )
             };
             if consumes_enrollment
                 && (e.enrollment["receipt"]["source_root"].is_null()
@@ -4415,6 +4422,7 @@ impl Manager {
                     attempt.receipt.is_some(),
                     attempt.generation,
                     owner.generation,
+                    entry.cache_only && !owner.cache_pending,
                     true,
                     attempt.completed_at,
                     observed,
@@ -5386,7 +5394,8 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                         }
                         owner.cache_pending = true;
                         let owner = owner.clone();
-                        manager.immutable(&format!("use-intent-{token}.json"), &value!({"schema":"chrono-worktree-managed-use-intent/v2","path":target,"attachment":e.attachment,"lease_path":owner.path,"lease_id":owner.id,"operation":use_operation,"report_path":report["report_path"],"managed_process_original":report["managed_process_original"]}))?;
+                        let intent = manager.immutable(&format!("use-intent-{token}.json"), &value!({"schema":"chrono-worktree-managed-use-intent/v2","path":target,"attachment":e.attachment,"lease_path":owner.path,"lease_id":owner.id,"operation":use_operation,"report_path":report["report_path"],"managed_process_original":report["managed_process_original"]}))?;
+                        report["managed_use_intent"] = value!(intent);
                     }
                     manager.ledger.entries[i].uses.push(token.into());
                     manager.save()?;

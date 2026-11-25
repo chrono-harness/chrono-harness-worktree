@@ -22,14 +22,27 @@ fn terminal_history_keeps_unknown_future_live_and_unexpired_records() {
 }
 
 #[cfg_attr(not(verus_keep_ghost), test)]
-fn cache_history_preserves_current_generations_and_unknown_completion() {
-    let expired = policy::retire_cache_history(true, 1, 2, true, Some(100), 110, 10, false);
-    let capacity = policy::retire_cache_history(true, 1, 2, true, Some(100), 100, 10, true);
-    let current = policy::retire_cache_history(true, 2, 2, true, Some(100), 110, 0, true);
-    let future = policy::retire_cache_history(true, 3, 2, true, Some(100), 110, 0, true);
-    let unknown = policy::retire_cache_history(true, 1, 2, true, None, 110, 0, true);
-    let incomplete = policy::retire_cache_history(false, 1, 2, true, Some(100), 110, 0, true);
-    let busy = policy::retire_cache_history(true, 1, 2, false, Some(100), 110, 0, true);
+fn main_enrollment_report_is_released_when_its_last_handoff_ends() {
+    expect(!policy::needs_enrollment_report(true, false, false));
+    expect(policy::needs_enrollment_report(true, true, false));
+    expect(policy::needs_enrollment_report(true, false, true));
+    expect(policy::needs_enrollment_report(false, false, false));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn cache_history_releases_a_settled_main_generation_and_keeps_pending_results() {
+    let expired = policy::retire_cache_history(true, 1, 2, false, true, Some(100), 110, 10, false);
+    let capacity = policy::retire_cache_history(true, 1, 2, false, true, Some(100), 100, 10, true);
+    let current = policy::retire_cache_history(true, 2, 2, false, true, Some(100), 110, 0, true);
+    let future = policy::retire_cache_history(true, 3, 2, false, true, Some(100), 110, 0, true);
+    let unknown = policy::retire_cache_history(true, 1, 2, false, true, None, 110, 0, true);
+    let incomplete = policy::retire_cache_history(false, 1, 2, false, true, Some(100), 110, 0, true);
+    let busy = policy::retire_cache_history(true, 1, 2, false, false, Some(100), 110, 0, true);
+    let settled = policy::retire_cache_history(true, 2, 2, true, true, Some(100), 110, 10, false);
+    let before = policy::retire_cache_history(true, 2, 2, true, true, Some(100), 109, 10, false);
+    let unfinished = policy::retire_cache_history(false, 2, 2, true, true, Some(100), 110, 10, false);
+    let held = policy::retire_cache_history(true, 2, 2, true, false, Some(100), 110, 10, false);
+    expect(settled && !before && !unfinished && !held);
     expect(expired && capacity && !current && !future && !unknown && !incomplete && !busy);
 }
 

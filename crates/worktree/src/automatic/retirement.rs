@@ -42,13 +42,16 @@ pub proof fn first_eligible_round(published: nat, keep: nat, released: nat,
 {}
 
 pub fn retire_cache_history(completed: bool, generation: u64, current_generation: u64,
-    consumers_released: bool, confirmed_at: Option<u64>, observed: u64,
-    keep_seconds: u64, over_limit: bool) -> (retire: bool)
-    ensures retire <==> (completed && generation < current_generation && consumers_released
+    current_main_cache_settled: bool, consumers_released: bool, confirmed_at: Option<u64>,
+    observed: u64, keep_seconds: u64, over_limit: bool) -> (retire: bool)
+    ensures retire <==> (completed && (generation < current_generation
+        || (generation == current_generation && current_main_cache_settled)) && consumers_released
         && confirmed_at.is_some() && confirmed_at.unwrap() <= observed
         && (over_limit || observed - confirmed_at.unwrap() >= keep_seconds)),
 {
-    retire_history(completed && generation < current_generation, consumers_released,
+    let settled = generation < current_generation
+        || (generation == current_generation && current_main_cache_settled);
+    retire_history(completed && settled, consumers_released,
         confirmed_at, observed, keep_seconds, over_limit)
 }
 }
