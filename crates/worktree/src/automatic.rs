@@ -2491,6 +2491,22 @@ impl Manager {
         Ok(())
     }
 
+    fn cleanup_receipt_identity(
+        &self,
+        report: &Value,
+        attempt: &Attempt,
+    ) -> crate::verified_lifecycle::AutomaticCleanupReceipt {
+        crate::verified_lifecycle::AutomaticCleanupReceipt {
+            schema_matches: report["schema"] == "chrono-worktree-report/v1",
+            cleanup_operation: report["operation"] == "cleanup",
+            automatic: report["automatic_cleanup"] == true,
+            host_matches: report["source_root"] == value!(self.inputs.policy.coordinator_root),
+            config_matches: report["config_path"] == self.inputs.config_path,
+            attempt_matches: report["report_path"] == attempt.path,
+            token_matches: report["lock_reason"] == attempt.token,
+        }
+    }
+
     /// A sealed producer can outlive its caller's ledger update. Recover only
     /// the original result reference; cleanup effects still require their own
     /// identity, ownership and Git checks in the normal execution path.
@@ -2538,21 +2554,14 @@ impl Manager {
             let bytes =
                 crate::recovery::state_bytes_for_consumer(&root, &attempt.path, Some(&role))?;
             let report = json(&bytes)?;
-            let terminal_matches = if report.get("terminal_handoff").is_some() {
-                report["terminal_handoff"] == handoff
-            } else {
-                report["terminal_receipt"] == value!(terminal.receipt)
-            };
-            if report["schema"] != "chrono-worktree-report/v1"
-                || report["operation"] != "cleanup"
-                || !matches!(report["status"].as_str(), Some("cleaned" | "failed"))
-                || report["source_root"] != value!(root)
-                || report["config_path"] != self.inputs.config_path
-                || report["report_path"] != attempt.path
-                || report["lock_reason"] != attempt.token
-                || report["automatic_cleanup"] != true
-                || !terminal_matches
-            {
+            if !crate::verified_lifecycle::published_cleanup_receipt(
+                &self.cleanup_receipt_identity(&report, attempt),
+                report["status"].as_str().unwrap_or(""),
+                report
+                    .get("terminal_handoff")
+                    .map(|facts| facts == &handoff),
+                report["terminal_receipt"] == value!(terminal.receipt),
+            ) {
                 return Err("cleanup result does not bind this terminal attempt".into());
             }
             if !inventory.published_original(&attempt.path, &sha256(&bytes), bytes.len() as u64)? {
@@ -2581,7 +2590,11 @@ impl Manager {
         inventory: &crate::retention::Inventory,
         role: &str,
     ) -> Result<bool, String> {
-        if entry.status != "disposed" || !terminal.artifacts_only || terminal.dispose_evidence {
+        if !crate::verified_lifecycle::artifacts_only_terminal(
+            &entry.status,
+            terminal.artifacts_only,
+            terminal.dispose_evidence,
+        ) {
             return Ok(false);
         }
         let Some(attempt) = entry.attempts.last() else {
@@ -2604,22 +2617,21 @@ impl Manager {
         }
         let source = inventory.producer_status("lifecycle-original", &receipt.path)?;
         let result = json(&bytes)?;
-        Ok(source["records"].as_array().is_some_and(|records|
-            matches!(records.as_slice(), [r] if r["phase"] == "released" && r["sealed"] == true))
-            && result["schema"] == "chrono-worktree-report/v1"
-            && result["operation"] == "cleanup"
-            && result["automatic_cleanup"] == true
-            && result["config_path"] == self.inputs.config_path
-            && result["source_root"] == value!(root)
-            && result["destination"] == value!(entry.path)
-            && result["head"] == terminal.head
-            && result["report_path"] == attempt.path
-            && result["lock_reason"] == attempt.token
-            && result["status"] == "cleaned"
-            && result["worktree_removal"] == "preserved"
-            && result["terminal_receipt"] == value!(terminal.receipt)
-            && result["terminal_input"]
-                == self.retained_input(&terminal.receipt.path, terminal_bytes, "receipt"))
+        let released_and_sealed = source["records"].as_array().is_some_and(|records|
+            matches!(records.as_slice(), [r] if r["phase"] == "released" && r["sealed"] == true));
+        Ok(
+            crate::verified_lifecycle::preserved_cleanup_consumed_terminal(
+                &self.cleanup_receipt_identity(&result, attempt),
+                released_and_sealed,
+                result["destination"] == value!(entry.path),
+                result["head"] == terminal.head,
+                result["status"].as_str().unwrap_or(""),
+                result["worktree_removal"].as_str().unwrap_or(""),
+                result["terminal_receipt"] == value!(terminal.receipt),
+                result["terminal_input"]
+                    == self.retained_input(&terminal.receipt.path, terminal_bytes, "receipt"),
+            ),
+        )
     }
 
     fn reconcile_terminal_handoffs(&mut self) -> Result<(), String> {

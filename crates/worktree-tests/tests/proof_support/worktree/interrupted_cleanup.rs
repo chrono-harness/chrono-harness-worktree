@@ -12,6 +12,52 @@ use vstd::vpanic as panic;
 
 verus! {
 #[cfg_attr(not(verus_keep_ghost), test)]
+fn published_and_preserved_receipts_keep_their_distinct_authorities() {
+    broadcast use vstd::string::group_string_axioms;
+    proof {
+        reveal_strlit("cleaned"); assert("cleaned"@.len() == 7);
+        reveal_strlit("failed"); assert("failed"@.len() == 6);
+        reveal_strlit("unknown-status"); assert("unknown-status"@.len() == 14);
+        reveal_strlit("preserved"); assert("preserved"@.len() == 9);
+        reveal_strlit("verified-absent"); assert("verified-absent"@.len() == 15);
+        reveal_strlit("disposed"); assert("disposed"@.len() == 8);
+        reveal_strlit("active"); assert("active"@.len() == 6);
+    }
+    let valid = policy::AutomaticCleanupReceipt { schema_matches: true, cleanup_operation: true, automatic: true, host_matches: true, config_matches: true, attempt_matches: true, token_matches: true };
+    expect(policy::published_cleanup_receipt(&valid,"cleaned", Some(true), false));
+    expect(policy::published_cleanup_receipt(&valid,"failed", None, true));
+    expect(!policy::published_cleanup_receipt(&valid,"cleaned", Some(false), true));
+    expect(!policy::published_cleanup_receipt(&valid,"failed", None, false));
+    expect(!policy::published_cleanup_receipt(&valid,"unknown-status", Some(true), true));
+    expect(policy::artifacts_only_terminal("disposed", true, false));
+    expect(!policy::artifacts_only_terminal("active", true, false));
+    expect(!policy::artifacts_only_terminal("disposed", false, false));
+    expect(!policy::artifacts_only_terminal("disposed", true, true));
+    expect(policy::preserved_cleanup_consumed_terminal(&valid,true,true,true,"cleaned","preserved",true,true));
+    expect(!policy::preserved_cleanup_consumed_terminal(&valid,true,true,true,"failed","preserved",true,true));
+    expect(!policy::preserved_cleanup_consumed_terminal(&valid,true,true,true,"cleaned","verified-absent",true,true));
+    let wrong = policy::AutomaticCleanupReceipt { schema_matches: false, ..valid };
+    expect(!policy::automatic_receipt_matches(&wrong));
+    let wrong = policy::AutomaticCleanupReceipt { cleanup_operation: false, ..valid };
+    expect(!policy::automatic_receipt_matches(&wrong));
+    let wrong = policy::AutomaticCleanupReceipt { automatic: false, ..valid };
+    expect(!policy::automatic_receipt_matches(&wrong));
+    let wrong = policy::AutomaticCleanupReceipt { host_matches: false, ..valid };
+    expect(!policy::automatic_receipt_matches(&wrong));
+    let wrong = policy::AutomaticCleanupReceipt { config_matches: false, ..valid };
+    expect(!policy::automatic_receipt_matches(&wrong));
+    let wrong = policy::AutomaticCleanupReceipt { attempt_matches: false, ..valid };
+    expect(!policy::automatic_receipt_matches(&wrong));
+    let wrong = policy::AutomaticCleanupReceipt { token_matches: false, ..valid };
+    expect(!policy::automatic_receipt_matches(&wrong));
+    expect(!policy::preserved_cleanup_consumed_terminal(&valid,false,true,true,"cleaned","preserved",true,true));
+    expect(!policy::preserved_cleanup_consumed_terminal(&valid,true,false,true,"cleaned","preserved",true,true));
+    expect(!policy::preserved_cleanup_consumed_terminal(&valid,true,true,false,"cleaned","preserved",true,true));
+    expect(!policy::preserved_cleanup_consumed_terminal(&valid,true,true,true,"cleaned","preserved",false,true));
+    expect(!policy::preserved_cleanup_consumed_terminal(&valid,true,true,true,"cleaned","preserved",true,false));
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
 fn interrupted_cleanup_requires_each_original_identity() {
     broadcast use vstd::string::group_string_axioms;
     proof {
