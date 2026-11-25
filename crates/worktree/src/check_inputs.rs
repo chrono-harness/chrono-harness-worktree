@@ -6,6 +6,12 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 verus! {
+pub fn accepts_input_entry(expected: &str, observed: &str, regular: bool) -> (valid: bool)
+    ensures valid == (regular && expected@ == observed@),
+{
+    regular && <&str>::exec_eq(expected, observed)
+}
+
 pub fn full_paths_distinct(origin: &str, context: &str, manifest: &str) -> (valid: bool)
     ensures valid == (origin@ != context@ && origin@ != manifest@ && context@ != manifest@),
 {
@@ -48,7 +54,11 @@ use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 #[cfg(not(verus_keep_ghost))]
 pub enum Policy {
     Full(FullPolicy),
-    Scoped { collection_manifest: String },
+    Scoped {
+        collection_manifest: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        single_file_directory: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -57,6 +67,8 @@ pub enum Policy {
 pub struct FullPolicy {
     #[serde(default = "default_observation_age_program")]
     pub observation_age_program: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub single_file_directory: Option<String>,
     pub origin_path: String,
     pub context_path: String,
     pub collection_manifest: String,
@@ -70,11 +82,22 @@ fn default_observation_age_program() -> String {
 
 #[cfg(not(verus_keep_ghost))]
 impl Policy {
+    fn single_file_directory(&self) -> Option<&str> {
+        match self {
+            Self::Full(policy) => policy.single_file_directory.as_deref(),
+            Self::Scoped {
+                single_file_directory,
+                ..
+            } => single_file_directory.as_deref(),
+        }
+    }
+
     fn collection_manifest(&self) -> &str {
         match self {
             Self::Full(full) => &full.collection_manifest,
             Self::Scoped {
                 collection_manifest,
+                ..
             } => collection_manifest,
         }
     }
@@ -83,6 +106,16 @@ impl Policy {
 #[cfg(not(verus_keep_ghost))]
 pub(crate) fn validate(policy: &Policy) -> Result<(), String> {
     artifact_path(policy.collection_manifest())?;
+    if let Some(path) = policy.single_file_directory() {
+        artifact_path(path)?;
+        if path
+            .split('/')
+            .any(|part| matches!(part, "" | "." | ".." | ".git"))
+            || Path::new(path).parent() == Some(Path::new(".chrono-harness/state"))
+        {
+            return Err("single-file input must name a file in a dedicated state directory".into());
+        }
+    }
     let Policy::Full(p) = policy else {
         return Ok(());
     };
@@ -99,6 +132,36 @@ pub(crate) fn validate(policy: &Policy) -> Result<(), String> {
     }
     Ok(())
 }
+/// A declared subdirectory in the existing state area may contain only its optional data file.
+#[cfg(not(verus_keep_ghost))]
+fn observe_input_directory(root: &Path, path: &str) -> Result<Option<(String, u64)>, String> {
+    let file = no_symlink_parents(root, path)?;
+    let parent = file.parent().ok_or("missing declared input directory")?;
+    let name = file
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or("invalid declared filename")?;
+    let entries = match fs::read_dir(parent) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(format!("read {}: {e}", parent.display())),
+    };
+    let mut observed = None;
+    for item in entries {
+        let item = item.map_err(|e| e.to_string())?;
+        let actual = item.file_name();
+        let kind = item.file_type().map_err(|e| e.to_string())?;
+        if !accepts_input_entry(name, actual.to_str().unwrap_or(""), kind.is_file()) {
+            return Err(format!(
+                "unexpected installation data entry: {}",
+                item.path().display()
+            ));
+        }
+        observed = Some(file_identity(&file)?);
+    }
+    Ok(observed)
+}
+
 /// Publish the final original producer report in the destination, then its exact association.
 #[cfg(not(verus_keep_ghost))]
 pub(crate) fn publish_origin(source: &Path, report: &Value, p: &FullPolicy) -> Result<(), String> {
@@ -202,6 +265,28 @@ fn produce(
             let (registrations, digest) =
                 start::registrations(r, root, &candidate, &req.host_config)?;
             start::registered_policy(&registrations, path, &r.config.report_directory)?;
+            let input = r
+                .config
+                .check_inputs
+                .as_ref()
+                .and_then(Policy::single_file_directory)
+                .map(str::to_owned);
+            let observe = || {
+                input
+                    .as_ref()
+                    .map(|path| observe_input_directory(root, path))
+                    .transpose()
+            };
+            let initial_input = observe()?;
+            if let Some(path) = &input {
+                report["single_file_directory"] = json!({"path":path,"file":initial_input});
+            }
+            let verify_input = || -> Result<(), String> {
+                if observe()? != initial_input {
+                    return Err("declared input changed during local preparation".into());
+                }
+                Ok(())
+            };
             start::cleanliness_at(r, root, &candidate, registrations.config())?;
             let parents =
                 facts::commit_parents(&r.git(root, &["cat-file", "commit", &candidate])?)?;
@@ -217,6 +302,7 @@ fn produce(
                     return Err("HEAD advanced during local preparation".into());
                 }
                 start::cleanliness_at(r, root, &candidate, registrations.config())?;
+                verify_input()?;
                 req.validate(&r.config)?;
                 report["registry_digest"] = json!(digest);
                 report["base"] = Value::Null;
@@ -406,6 +492,7 @@ fn produce(
                 return Err("HEAD advanced during local preparation".into());
             }
             start::cleanliness_at(r, root, &candidate, registrations.config())?;
+            verify_input()?;
             req.validate(&r.config)?;
             report["registry_digest"] = json!(digest);
             report["base"] = json!(base);
