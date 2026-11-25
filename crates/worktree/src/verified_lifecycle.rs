@@ -430,6 +430,54 @@ pub enum AdoptedPolicySource {
     RetainedTarget,
 }
 
+pub struct AutomaticCleanupReceipt {
+    pub schema_matches: bool,
+    pub cleanup_operation: bool,
+    pub automatic: bool,
+    pub host_matches: bool,
+    pub config_matches: bool,
+    pub attempt_matches: bool,
+    pub token_matches: bool,
+}
+
+/// The report owner, invocation and policy all identify the same automatic cleanup.
+pub fn automatic_receipt_matches(r: &AutomaticCleanupReceipt) -> (matches: bool)
+    ensures matches == (r.schema_matches && r.cleanup_operation && r.automatic && r.host_matches
+        && r.config_matches && r.attempt_matches && r.token_matches),
+{
+    r.schema_matches && r.cleanup_operation && r.automatic && r.host_matches
+        && r.config_matches && r.attempt_matches && r.token_matches
+}
+
+pub fn published_cleanup_receipt(r: &AutomaticCleanupReceipt, status: &str,
+    inline: Option<bool>, original_receipt: bool) -> (matches: bool)
+    ensures matches == (r.schema_matches && r.cleanup_operation && r.automatic && r.host_matches
+        && r.config_matches && r.attempt_matches && r.token_matches
+        && (status@ == "cleaned"@ || status@ == "failed"@)
+        && (match inline { Some(equal) => equal, None => original_receipt })),
+{
+    automatic_receipt_matches(r) && (<&str>::exec_eq(status,"cleaned") || <&str>::exec_eq(status,"failed"))
+        && (match inline { Some(equal) => equal, None => original_receipt })
+}
+
+pub fn artifacts_only_terminal(status: &str, artifacts_only: bool, disposing_evidence: bool) -> (applies: bool)
+    ensures applies == (status@ == "disposed"@ && artifacts_only && !disposing_evidence),
+{
+    <&str>::exec_eq(status,"disposed") && artifacts_only && !disposing_evidence
+}
+
+pub fn preserved_cleanup_consumed_terminal(r: &AutomaticCleanupReceipt, released_and_sealed: bool,
+    checkout_matches: bool, head_matches: bool, status: &str, removal: &str,
+    same_receipt: bool, same_input: bool) -> (consumed: bool)
+    ensures consumed == (r.schema_matches && r.cleanup_operation && r.automatic && r.host_matches
+        && r.config_matches && r.attempt_matches && r.token_matches && released_and_sealed
+        && checkout_matches && head_matches && status@ == "cleaned"@ && removal@ == "preserved"@
+        && same_receipt && same_input),
+{
+    automatic_receipt_matches(r) && released_and_sealed && checkout_matches && head_matches
+        && <&str>::exec_eq(status,"cleaned") && <&str>::exec_eq(removal,"preserved") && same_receipt && same_input
+}
+
 pub struct CleanupBinding<'a> {
     pub token: &'a str,
     pub report_path: &'a str,
