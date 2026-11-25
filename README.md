@@ -18,7 +18,7 @@
 
 先前受租约保护的轮数可以是任意有限值。这里的 S 包括下一次成功调度和取得其完整快照前的等待；B 包括前序地址的处理开销。使用方持续释放、转存或无需保留、源码已保全、时钟与目录身份稳定、Git 和文件系统操作成功，并且此后没有重新创建同一目录，是该条件界的前提。服务停机、始终持锁、权限失败或登记持续漏项时，可保留目录且没有固定墙钟上界。
 
-示例仓在 macOS 用户会话采用 launchd，将复用窗口缩为 23 秒，删除和原件保留窗口设为 24 秒。六轮定时维护成功，工作树、缓存和到期报告均已回收。另一次把原件保留窗口缩为 3 秒的实验中，退役记录在消费过程中到期，三轮维护报告失败。在 Ubuntu 用户会话中，systemd 定时器实际触发了到期工作树、Python 缓存和 PR 提醒的回收，并保留了仍有效的提醒。[macOS 验收](https://github.com/chrono-harness/chrono-harness-example/pull/29) · [Ubuntu 定时运行](https://github.com/chrono-harness/chrono-harness-example/actions/runs/45231805116)
+历史验收中，示例仓在 macOS 用户会话采用 launchd，将复用窗口缩为 23 秒，删除和原件保留窗口设为 24 秒。六轮定时维护成功，工作树、缓存和到期报告均已回收。另一次把原件保留窗口缩为 3 秒的实验中，退役记录在消费过程中到期，三轮维护报告失败。在 Ubuntu 用户会话中，systemd 定时器实际触发了到期工作树、Python 缓存和 PR 提醒的回收，并保留了仍有效的提醒。[macOS 验收](https://github.com/chrono-harness/chrono-harness-example/pull/29) · [Ubuntu 定时运行](https://github.com/chrono-harness/chrono-harness-example/actions/runs/45231805116)
 
 ## 复用本地完整检查的上下文
 
@@ -38,7 +38,7 @@ workflow 判断原始 UTC 时间与宿主设定的 `max_age_hours`。上下文�
 
 采用 `.chrono-harness/logging.json` 的宿主须在工作树外安装独立发行的 `chrono-diagnostics`。维护时按主检出的 `diagnostics_program` 或 PATH 选择该命令，同步调用 `expire-logs-v1 ROOT` 核对每次结果。日志策略归该命令解释，部分删除失败进入工作树维护报告；没有日志配置时无需安装该程序。
 
-宿主采用 `.chrono-harness/retention.json` 时，worktree 在删除业务目录前向已安装的 `chrono-harness retained-artifacts-v1` 查询这些路径。保管进程检查仍被消费者占用的原件，并把目录删除租约的文件描述符交给 worktree。回收前会再次核对租约。请在工作树外安装本仓 mise 配置选定的 runner 发行。worktree 从 PATH 查找 runner。使用系统 PATH 的定时服务可从宿主的工作树程序链接旁加载同一套安装中的 runner。
+宿主采用 `.chrono-harness/retention.json` 时，worktree 在删除业务目录前向已安装的 `chrono-harness retained-artifacts-v1` 查询这些路径。保管进程检查仍被消费者占用的原件，并把目录删除租约的文件描述符交给 worktree。回收前会再次核对租约。请在工作树外安装本仓 mise 配置选定的 runner 发行。worktree 从 PATH 查找 runner。使用系统 PATH 的维护服务可从宿主的工作树程序链接旁加载同一套安装中的 runner。
 
 单独选装 worktree 时，v3 主机在已登记的报告业务目录中保存工作树报告和进程原件。运行 `maintain` 时，`terminal_history.keep_seconds` 同时决定单工具报告的保留时间。省略该字段时报告默认保留 24 小时。需要长期使用的报告须在窗口内复制到持久存储。活跃进程持有内核租约，仍由现行登记或保留窗口内报告引用的原件继续保留。到期且最后一个引用结束后，由下一次取得目录租约的成功维护轮次删除。宿主配置定时维护后，这一过程自动运行。已配置通用原件保管的宿主使用其登记的保留策略。 仅管理缓存的主检出在本次检查及结果交接完成后释放首次检查报告的登记引用。最后一代已成功回收且无待处理缓存时，维护在缓存历史窗口到期后复核并释放该次处置回执。登记和内核租约保留，可再次运行检查。
 
@@ -58,16 +58,20 @@ workflow 判断原始 UTC 时间与宿主设定的 `max_age_hours`。上下文�
 
 `path:` 后是相对当前工作树的文件或目录。目录范围包括后代。用 `checkout` 声明整棵树。Git 的 index、HEAD、当前分支与指定的公共引用分别用 `git:index`、`git:head`、`git:branch` 和 `git:refs/heads/名字` 声明。同一仓库中的两个检出有各自的 index，可以竞争同一个实际分支引用。维护方应为实际会写 index 和 ref 的复合操作同时登记这两个资源。只有通过本入口进入并获得保护的命令参加调度；其他 Git 客户端仍使用 Git 自己的锁。
 
-启用此配置后，缺少范围的命令保守地占用当前工作树、其 Git 元数据和公共引用。具体命令只在与当前消费者的读写范围冲突时被拒绝，最后一个仍持有能力的子孙进程结束后可以重新进入。临时声明位于协调者的 operation-scopes 业务目录。正常返回、后续操作和定时维护都可回收到期声明。机器或服务中断期间没有墙钟清理上界。
+启用此配置后，缺少范围的命令保守地占用当前工作树、其 Git 元数据和公共引用。具体命令只在与当前消费者的读写范围冲突时被拒绝，最后一个仍持有能力的子孙进程结束后可以重新进入。临时声明位于协调者的 operation-scopes 业务目录。正常返回、后续操作和事件触发的维护都可回收到期声明。机器或服务中断期间没有墙钟清理上界。
 
 ## 本仓本地检查的清理
 
 开发者运行 `mise exec -- ./check.sh` 时，工作树租约覆盖整个检查。准备输入和原报告写入 `.chrono-harness/state/preparation/`，单元结果在 `.chrono-harness/state/worktree/`，汇总在 `.chrono-harness/state/collection/`。各次执行的证明编译库和依赖清单随操作报告管理，原生构建使用专属的 `native-check/` 临时目录。需要保留的结果应在当日清理前复制到持久存储。
 
-完成工具安装后，可在主检出的用户 crontab 中登记每日 03:00 的滚动维护。将下方两个绝对路径替换为主检出和本机 `command -v mise` 的实际值。
+在主检出运行 `mise exec -- chrono-worktree maintain` 可显式维护。宿主也可用 launchd 或 systemd 接管 Unix 数据报 socket，并调用 `chrono-worktree maintenance-service --host-root <主检出>`。在 .chrono-harness/maintenance.json 登记以下策略；state_directory 须与已提交的 cleanup 策略相同。宿主应先停用已有定时入口，再启用套接字。
 
-```cron
-0 3 * * * cd '/path/to/chrono-harness-worktree' && '/path/to/mise' exec -- chrono-worktree maintain --host-root . --config .chrono-harness/worktree.json
+```json
+{"schema":"chrono-unified-maintenance/v2","state_directory":".chrono-harness/state/automatic-cleanup-v2/","socket":".chrono-harness/state/maintenance.sock"}
 ```
+
+业务事件唤醒服务。空队列直接退出；有事件时先等待协调者排他租约，再每次接收至多 64 条并运行一轮。服务清空队列后退出，套接字继续接收事件。单轮结果在 stderr 返回原报告引用；退出状态 `maintenance-queue-empty` 表示已排空当时的队列。到期改变删除资格；如果没有后续事件或显式维护，墙钟本身不会启动一轮。
+
+宿主可在已提交的 `.chrono-harness/worktree.json` 的 `maintenance_operations` 对象中，按名称登记额外的清理操作，例如 `{"pr-reminders":{"program":".chrono-harness/bin/chrono-pr","args":["pr-reminders"]}}`。每个操作从主检出直接运行，使用协调者配置的环境、时限和输出上限；一个负责方失败时，其他操作仍会执行。原始退出状态、输出及错误进入同一维护报告。采用统一维护并使用 runner 保管原件的宿主，还须安装支持 `retained-artifacts-v1 --maintenance-round` 的 runner，防止本轮报告再次唤醒自身。
 
 同一日历批次共用截止时刻。调度器在运行且取得排他租约时回收已登记的空闲目录。首次登记前已有的目录需要核对、转存并显式接管。普通任务工作树在超过 24 小时且唯一源码已保全后可整树回收；仍在使用的原件继续保管。工作树日志和处置报告在一天的窗口及当前使用方结束后滚动。工具包位于 mise 共享安装目录，本仓的 bin/ 只保存链接。

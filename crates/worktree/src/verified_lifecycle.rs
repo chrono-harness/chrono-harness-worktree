@@ -85,7 +85,7 @@ pub use crate::automatic::migration::{
 };
 #[cfg(not(verus_keep_ghost))]
 pub use crate::automatic::service::{
-    maintenance_exclusions, maintenance_idle_exit, maintenance_retention_phase, next_enrollment,
+    maintenance_exclusions, maintenance_has_events, maintenance_retention_phase, next_enrollment,
     validate_activation_sequence,
 };
 #[cfg(verus_keep_ghost)]
@@ -97,7 +97,7 @@ pub use automatic_verification::migration::{
 };
 #[cfg(verus_keep_ghost)]
 pub use automatic_verification::service::{
-    maintenance_exclusions, maintenance_idle_exit, maintenance_retention_phase, next_enrollment,
+    maintenance_exclusions, maintenance_has_events, maintenance_retention_phase, next_enrollment,
     validate_activation_sequence,
 };
 

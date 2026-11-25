@@ -32,8 +32,18 @@ impl Session {
     pub(crate) fn open(root: &Path) -> Result<Self, String> {
         let (socket, input) = UnixStream::pair().map_err(|e| e.to_string())?;
         let program = crate::installed_tool("chrono-harness");
-        let mut child = Command::new(program)
-            .arg("retained-artifacts-v1")
+        let mut command = Command::new(program);
+        command.arg("retained-artifacts-v1");
+        if crate::maintenance_signal::RoundGuard::active()
+            && (root
+                .join(crate::maintenance_signal::POLICY_PATH)
+                .try_exists()
+                .map_err(|e| e.to_string())?
+                || std::env::var_os(crate::maintenance_signal::CONTEXT_ENV).is_some())
+        {
+            command.arg("--maintenance-round");
+        }
+        let mut child = command
             .current_dir(root)
             .stdin(Stdio::from(OwnedFd::from(input)))
             .stdout(Stdio::piped())
