@@ -4109,8 +4109,8 @@ impl Manager {
         failures.extend(self.retire_leases(r, report)?);
         for i in 0..self.ledger.entries.len() {
             let e = self.ledger.entries[i].clone();
-            let cache =
-                e.status == "active" && e.ownership.as_ref().is_some_and(|o| o.cache_pending);
+            let cache_pending = e.ownership.as_ref().is_some_and(|o| o.cache_pending);
+            let cache = crate::verified_lifecycle::active_cache(&e.status, cache_pending);
             let age = if matches!(e.status.as_str(), "active" | "terminal" | "retained")
                 && e.enrollment["age_retirement"].is_null()
             {
@@ -4127,47 +4127,56 @@ impl Manager {
             };
             if !crate::verified_lifecycle::select_drain(
                 &e.status,
-                e.ownership.as_ref().is_some_and(|o| o.cache_pending),
+                cache_pending,
                 maintenance,
                 e.terminal.as_ref().is_some_and(|t| t.artifacts_only),
                 age,
             ) {
                 continue;
             }
-            if self._gate.lease.is_some() && e.ownership.is_none() {
-                report["drain"].as_array_mut().unwrap().push(value!({"path":e.path,"status":"preserved","preserved_reason":"legacy/unknown enrollment has no kernel ownership"}));
-                continue;
-            }
-            if exclude.contains(&e.path) && (!cache || !e.cache_only) {
-                report["drain"].as_array_mut().unwrap().push(value!({"path":e.path,"status":"preserved","preserved_reason":"invoking source or destination"}));
-                continue;
-            }
-            let _lease = if e.ownership.is_some() {
-                match self.lease(&e, true) {
-                    Ok(Some(lease)) => Some(lease),
-                    Ok(None) => {
-                        self.progress(i, crate::verified_lifecycle::CleanupStage::WaitingForConsumers,
+            use crate::verified_lifecycle::{DrainLease, DrainTarget};
+            let target = crate::verified_lifecycle::drain_target(
+                self._gate.lease.is_some(),
+                e.ownership.is_some(),
+                exclude.contains(&e.path),
+                cache,
+                e.cache_only,
+            );
+            let _lease = match target {
+                DrainTarget::UnknownOwner => {
+                    report["drain"].as_array_mut().unwrap().push(value!({"path":e.path,"status":"preserved","preserved_reason":"legacy/unknown enrollment has no kernel ownership"}));
+                    continue;
+                }
+                DrainTarget::ExcludedPath => {
+                    report["drain"].as_array_mut().unwrap().push(value!({"path":e.path,"status":"preserved","preserved_reason":"invoking source or destination"}));
+                    continue;
+                }
+                DrainTarget::Unowned => None,
+                DrainTarget::AcquireLease => {
+                    match crate::verified_lifecycle::drain_lease(self.lease(&e, true)) {
+                        DrainLease::Held(lease) => Some(lease),
+                        DrainLease::Busy => {
+                            self.progress(i, crate::verified_lifecycle::CleanupStage::WaitingForConsumers,
                             "live registered consumers hold enrollment lease; retry after their release", report)?;
-                        report["drain"].as_array_mut().unwrap().push(value!({"path":e.path,"status":"preserved","preserved_reason":"live registered consumers hold enrollment lease"}));
-                        continue;
-                    }
-                    Err(error) => {
-                        self.progress(
-                            i,
-                            crate::verified_lifecycle::CleanupStage::Failed,
-                            &error,
-                            report,
-                        )?;
-                        failures.push(format!("{}: {error}", e.path.display()));
-                        report["drain"]
-                            .as_array_mut()
-                            .unwrap()
-                            .push(value!({"path":e.path,"status":"failed","error":error}));
-                        continue;
+                            report["drain"].as_array_mut().unwrap().push(value!({"path":e.path,"status":"preserved","preserved_reason":"live registered consumers hold enrollment lease"}));
+                            continue;
+                        }
+                        DrainLease::Failed(error) => {
+                            self.progress(
+                                i,
+                                crate::verified_lifecycle::CleanupStage::Failed,
+                                &error,
+                                report,
+                            )?;
+                            failures.push(format!("{}: {error}", e.path.display()));
+                            report["drain"]
+                                .as_array_mut()
+                                .unwrap()
+                                .push(value!({"path":e.path,"status":"failed","error":error}));
+                            continue;
+                        }
                     }
                 }
-            } else {
-                None
             };
             if let Some(lease) = &_lease {
                 if let Err(error) = self.reconcile_uses(i, lease) {
@@ -4185,7 +4194,7 @@ impl Manager {
                     continue;
                 }
             }
-            if !self.ledger.entries[i].uses.is_empty() {
+            if !crate::verified_lifecycle::drain_uses_released(self.ledger.entries[i].uses.len()) {
                 self.progress(i, crate::verified_lifecycle::CleanupStage::WaitingForConsumers,
                     "active/unknown managed use; establish original result or reconcile under exclusive lease", report)?;
                 failures.push(format!("{}: active/unknown managed use", e.path.display()));
