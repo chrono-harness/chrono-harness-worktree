@@ -1,5 +1,9 @@
 #[cfg(verus_keep_ghost)]
 use super::policy as input_policy;
+#[cfg(not(verus_keep_ghost))]
+use chrono_worktree::verified_lifecycle as input_policy;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
 
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
@@ -8,6 +12,61 @@ use vstd::prelude::*;
 use vstd::vpanic as panic;
 
 verus! {
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn presence_hash_and_length_must_stay_together() {
+    proof {
+        reveal_strlit("a"); reveal_strlit("bb");
+        assert("a"@.len() != "bb"@.len());
+    }
+    let before = Some(("a", 7u64));
+    if !input_policy::unchanged_input(None, None)
+        || !input_policy::unchanged_input(before, Some(("a", 7)))
+        || input_policy::unchanged_input(None, before)
+        || input_policy::unchanged_input(before, None)
+        || input_policy::unchanged_input(before, Some(("bb", 7)))
+        || input_policy::unchanged_input(before, Some(("a", 8))) { panic!(); }
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn policy_requires_a_dedicated_state_directory() {
+    broadcast use vstd::array::group_array_axioms;
+    proof {
+        reveal_strlit("versions"); reveal_strlit("install"); reveal_strlit(".git");
+        reveal_strlit(""); reveal_strlit("."); reveal_strlit("..");
+        reveal_strlit(".chrono-harness"); reveal_strlit("state"); reveal_strlit("other");
+        assert("state"@[0] != "other"@[0]);
+        assert("install"@.len() == 7 && "versions"@.len() == 8);
+        assert(""@.len() == 0 && "."@.len() == 1 && ".."@.len() == 2 && ".git"@.len() == 4);
+        assert(input_policy::usable_input_component("install"));
+        assert(input_policy::usable_input_component("versions"));
+    }
+    let valid = [".chrono-harness", "state", "install", "versions"];
+    let root = [".chrono-harness", "state", "versions"];
+    let reserved = [".chrono-harness", "state", ".git", "versions"];
+    let empty = [".chrono-harness", "state", "", "versions"];
+    let outside = [".chrono-harness", "other", "install", "versions"];
+    let good = input_policy::dedicated_input_path(&valid);
+    let at_root = input_policy::dedicated_input_path(&root);
+    let git = input_policy::dedicated_input_path(&reserved);
+    let blank = input_policy::dedicated_input_path(&empty);
+    let elsewhere = input_policy::dedicated_input_path(&outside);
+    proof {
+        assert forall|i: int| 2 <= i < valid@.len() implies
+            input_policy::usable_input_component(#[trigger] valid@[i]) by {
+            if i == 2 { assert(valid@[i] == "install"); }
+            else { assert(valid@[i] == "versions"); }
+        }
+        assert(reserved@[2] == ".git");
+        assert(empty@[2] == "");
+        assert(good);
+        assert(!at_root);
+        assert(!git);
+        assert(!blank);
+        assert(!elsewhere);
+    }
+    if !good || at_root || git || blank || elsewhere { panic!(); }
+}
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn only_the_named_regular_input_is_accepted() {
     proof {

@@ -12,6 +12,48 @@ pub fn accepts_input_entry(expected: &str, observed: &str, regular: bool) -> (va
     regular && <&str>::exec_eq(expected, observed)
 }
 
+pub open spec fn usable_input_component(value: &str) -> bool {
+    value@ != ""@ && value@ != "."@ && value@ != ".."@ && value@ != ".git"@
+}
+
+/// The caller passes the path split at every slash, including empty components.
+pub fn dedicated_input_path(parts: &[&str]) -> (valid: bool)
+    ensures valid == (parts.len() >= 4 && parts@[0]@ == ".chrono-harness"@
+        && parts@[1]@ == "state"@
+        && forall|i: int| 2 <= i < parts.len() ==> usable_input_component(parts@[i])),
+{
+    if parts.len() < 4 || !<&str>::exec_eq(parts[0], ".chrono-harness")
+        || !<&str>::exec_eq(parts[1], "state") { return false; }
+    let mut i = 2;
+    while i < parts.len()
+        invariant 2 <= i <= parts.len(),
+            forall|j: int| 2 <= j < i ==> usable_input_component(parts@[j]),
+        decreases parts.len() - i,
+    {
+        let part = parts[i];
+        if <&str>::exec_eq(part, "") || <&str>::exec_eq(part, ".")
+            || <&str>::exec_eq(part, "..") || <&str>::exec_eq(part, ".git") {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+pub fn unchanged_input(first: Option<(&str, u64)>, last: Option<(&str, u64)>) -> (same: bool)
+    ensures same == match (first, last) {
+        (Some((a, n)), Some((b, m))) => a@ == b@ && n == m,
+        (None, None) => true,
+        _ => false,
+    },
+{
+    match (first, last) {
+        (Some((a, n)), Some((b, m))) => <&str>::exec_eq(a, b) && n == m,
+        (None, None) => true,
+        _ => false,
+    }
+}
+
 pub fn full_paths_distinct(origin: &str, context: &str, manifest: &str) -> (valid: bool)
     ensures valid == (origin@ != context@ && origin@ != manifest@ && context@ != manifest@),
 {
@@ -108,11 +150,8 @@ pub(crate) fn validate(policy: &Policy) -> Result<(), String> {
     artifact_path(policy.collection_manifest())?;
     if let Some(path) = policy.optional_input_file() {
         artifact_path(path)?;
-        if path
-            .split('/')
-            .any(|part| matches!(part, "" | "." | ".." | ".git"))
-            || Path::new(path).parent() == Some(Path::new(".chrono-harness/state"))
-        {
+        let components: Vec<_> = path.split('/').collect();
+        if !dedicated_input_path(&components) {
             return Err("single-file input must name a file in a dedicated state directory".into());
         }
     }
@@ -280,7 +319,13 @@ fn produce(
                 report["optional_input_file"] = json!({"path":path,"identity":initial_input});
             }
             let verify_input = || -> Result<(), String> {
-                if observe()? != initial_input {
+                fn identity((hash, bytes): &(String, u64)) -> (&str, u64) {
+                    (hash.as_str(), *bytes)
+                }
+                if !unchanged_input(
+                    initial_input.as_ref().map(identity),
+                    observe()?.as_ref().map(identity),
+                ) {
                     return Err("declared input changed during local preparation".into());
                 }
                 Ok(())
