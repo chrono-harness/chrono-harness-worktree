@@ -1,11 +1,32 @@
 //! Roll the registered worktree report directory when no shared original owner is installed.
 //! Current Git source, inherited directory leases and enrollment references take precedence.
+use vstd::{contrib::exec_spec::ExecSpecEq, prelude::*};
+
+verus! {
+/// The observed document belongs to this publisher and this report address.
+pub fn report_owner_matches(schema: &str, root_matches: bool,
+    expected_path: &str, recorded_path: &str, expected_token: &str, recorded_token: &str,
+    named: &str, recorded: &str) -> (matched: bool)
+    ensures matched == (schema@ == "chrono-worktree-report/v1"@ && root_matches
+        && expected_path@ == recorded_path@ && expected_token@ == recorded_token@
+        && named@ == recorded@),
+{
+    <&str>::exec_eq(schema, "chrono-worktree-report/v1") && root_matches
+        && <&str>::exec_eq(expected_path, recorded_path)
+        && <&str>::exec_eq(expected_token, recorded_token)
+        && <&str>::exec_eq(named, recorded)
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use super::*;
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::{BTreeMap, BTreeSet},
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(not(verus_keep_ghost))]
 struct Original {
     identity: String,
     bytes: u64,
@@ -13,7 +34,8 @@ struct Original {
     dependencies: Vec<String>,
 }
 
-fn name_token(name: &str) -> Option<&str> {
+#[cfg(not(verus_keep_ghost))]
+fn name_token(name: &str) -> Option<(&str, &str)> {
     let (token, _) = name.split_once(".json")?;
     let mut fields = token.rsplitn(4, '-');
     let sequence = fields.next()?;
@@ -27,9 +49,10 @@ fn name_token(name: &str) -> Option<&str> {
     {
         return None;
     }
-    Some(token)
+    Some((token, operation))
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn capture(root: &Path, relative: &str, dependencies: Vec<String>) -> Result<Original, String> {
     let path = no_symlink_parents(root, relative)?;
     let metadata = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
@@ -56,16 +79,35 @@ fn capture(root: &Path, relative: &str, dependencies: Vec<String>) -> Result<Ori
     })
 }
 
-fn recognized_report(root: &Path, prefix: &str, name: &str, token: &str, value: &Value) -> bool {
-    value["schema"] == "chrono-worktree-report/v1"
-        && value["source_root"] == value!(root)
-        && value["report_path"] == format!("{prefix}{name}")
-        && value["lock_reason"] == token
-        && value["operation"]
-            .as_str()
-            .is_some_and(|op| token.strip_prefix(op).is_some_and(|s| s.starts_with('-')))
+#[cfg(not(verus_keep_ghost))]
+fn recognized_report(
+    root: &Path,
+    address: &str,
+    token: &str,
+    operation: &str,
+    value: &Value,
+) -> bool {
+    let (Some(schema), Some(recorded_path), Some(recorded_token), Some(recorded_operation)) = (
+        value["schema"].as_str(),
+        value["report_path"].as_str(),
+        value["lock_reason"].as_str(),
+        value["operation"].as_str(),
+    ) else {
+        return false;
+    };
+    report_owner_matches(
+        schema,
+        value["source_root"] == value!(root),
+        address,
+        recorded_path,
+        token,
+        recorded_token,
+        operation,
+        recorded_operation,
+    )
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn use_binding(value: &Value) -> Option<crate::verified_lifecycle::ManagedUseBinding<'_>> {
     let process = &value["managed_process_original"];
     Some(crate::verified_lifecycle::ManagedUseBinding {
@@ -80,6 +122,7 @@ fn use_binding(value: &Value) -> Option<crate::verified_lifecycle::ManagedUseBin
 
 /// A sidecar has the report's actual receipt, or its own identity-bound operation record.
 /// Undeclared foreign files in either business directory never enter the disposal set.
+#[cfg(not(verus_keep_ghost))]
 fn related_file(
     root: &Path,
     report_path: &str,
@@ -169,6 +212,7 @@ fn related_file(
     }
     Ok(false)
 }
+#[cfg(not(verus_keep_ghost))]
 pub(super) fn expire(
     r: &mut Runner,
     token: &str,
@@ -218,6 +262,7 @@ pub(super) fn expire(
     r.report_guard = Some(crate::ownership::DirectoryLease::shared(&directory)?);
     result
 }
+#[cfg(not(verus_keep_ghost))]
 fn expire_locked(
     r: &mut Runner,
     token: &str,
@@ -265,7 +310,7 @@ fn expire_locked(
         let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
             continue;
         };
-        let Some(report_token) = name_token(&name) else {
+        let Some((report_token, operation)) = name_token(&name) else {
             continue;
         };
         let path = format!("{prefix}{name}");
@@ -298,7 +343,7 @@ fn expire_locked(
         let Ok(report) = crate::document::json(&bytes) else {
             continue;
         };
-        if !recognized_report(root, &prefix, &name, report_token, &report) {
+        if !recognized_report(root, &path, report_token, operation, &report) {
             continue;
         }
         let mut dependencies = crate::recovery::original_paths(root, &report)?;

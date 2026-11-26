@@ -406,6 +406,21 @@ fn ordinary_unpublished_activity_retains_the_original_caller_inputs() {
 
 
 
+#[cfg(verus_keep_ghost)]
+fn standalone_report_owner_requires_each_publication_field(path: &str, token: &str,
+    operation: &str, other: &str)
+    requires path@ != other@, token@ != other@, operation@ != other@,
+        other@ != "chrono-worktree-report/v1"@,
+{
+    let schema = "chrono-worktree-report/v1";
+    expect(policy::report_owner_matches(schema, true, path, path, token, token, operation, operation));
+    expect(!policy::report_owner_matches(other, true, path, path, token, token, operation, operation));
+    expect(!policy::report_owner_matches(schema, false, path, path, token, token, operation, operation));
+    expect(!policy::report_owner_matches(schema, true, path, other, token, token, operation, operation));
+    expect(!policy::report_owner_matches(schema, true, path, path, token, other, operation, operation));
+    expect(!policy::report_owner_matches(schema, true, path, path, token, token, operation, other));
+}
+
 pub(crate) fn expect(actual: bool)
     requires actual,
 {
