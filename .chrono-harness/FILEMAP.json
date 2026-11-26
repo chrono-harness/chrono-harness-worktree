@@ -324,7 +324,11 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/worktree-tests/Cargo.toml",
@@ -777,7 +781,11 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/worktree/Cargo.toml",
@@ -789,7 +797,11 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/worktree/src/artifact_disposal.rs",
@@ -801,7 +813,20 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_owner_publication.rs",
+            "operation": "verify.owner-publication"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/worktree/src/automatic.rs",

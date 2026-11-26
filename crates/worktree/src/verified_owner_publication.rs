@@ -5,6 +5,13 @@ use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
+#[cfg(verus_keep_ghost)]
+#[path = "artifact_disposal.rs"]
+mod artifact_disposal;
+#[cfg(not(verus_keep_ghost))]
+use crate::artifact_disposal;
+pub use artifact_disposal::{contains_source, disposal_directory, inventory_contains_source};
+
 verus! {
 
 /// 共享物理状态只绑定所有权协议和地址，不绑定每个工作树的清理选择。

@@ -1,13 +1,85 @@
 //! Explicit directory disposal shared by legacy checkout cleanup and lifecycle cleanup.
+#![allow(unexpected_cfgs)]
+#[cfg(verus_keep_ghost)]
+use super::{has_prefix, prefix};
+#[cfg(not(verus_keep_ghost))]
+use crate::verified_owner_publication::has_prefix;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+
+verus! {
+
+/// Registered directory names can have multiple trailing slashes.
+pub fn disposal_directory(name: &[u8]) -> (directory: &[u8])
+    ensures
+        directory@ == name@.subrange(0, directory@.len() as int),
+        directory@.len() <= name@.len(),
+        directory@.len() == 0 || directory@.last() != 47u8,
+        forall|i: int| directory@.len() <= i < name@.len() ==> name@[i] == 47u8,
+{
+    let mut end = name.len();
+    while end > 0 && name[end - 1] == 47u8
+        invariant
+            end <= name.len(),
+            forall|i: int| end <= i < name.len() ==> name@[i] == 47u8,
+        decreases end,
+    { end -= 1; }
+    name.split_at(end).0
+}
+
+pub fn contains_source(directory: &[u8], path: &[u8]) -> (retained: bool)
+    ensures retained <==> (prefix(path@, directory@)
+        && (path@.len() == directory@.len() || path@[directory@.len() as int] == 47u8)),
+{
+    has_prefix(path, directory)
+        && (path.len() == directory.len() || path[directory.len()] == 47u8)
+}
+
+/// Git errors carry their original type and value through either query.
+pub fn inventory_contains_source<E, F>(index: Result<Vec<u8>, E>, deletions: F)
+    -> (out: Result<bool, E>)
+    where F: FnOnce() -> Result<Vec<u8>, E>,
+    requires (index is Ok && index->Ok_0@.len() == 0) ==> deletions.requires(()),
+    ensures match index {
+        Err(error) => out == Err::<bool, E>(error),
+        Ok(bytes) => if bytes@.len() != 0 { out == Ok::<bool, E>(true) }
+            else { exists|observed: Result<Vec<u8>, E>| #[trigger] deletions.ensures((), observed)
+                && out == match observed {
+                    Err(error) => Err::<bool, E>(error),
+                    Ok(data) => Ok::<bool, E>(data@.len() != 0),
+                } },
+    },
+{
+    match index {
+        Err(error) => Err(error),
+        Ok(bytes) => {
+            if !bytes.is_empty() { return Ok(true); }
+            match deletions() {
+                Err(error) => Err(error),
+                Ok(data) => Ok(!data.is_empty()),
+            }
+        },
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::document::{no_symlink_parents, relative_path};
+#[cfg(not(verus_keep_ghost))]
 use crate::start::Runner;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::os::unix::fs::{FileTypeExt, MetadataExt};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn registered(names: &[String], endpoints: &[&Value]) -> Result<(), String> {
     for name in names {
         for host in endpoints {
@@ -26,6 +98,7 @@ pub(crate) fn registered(names: &[String], endpoints: &[&Value]) -> Result<(), S
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn paths(
     r: &mut Runner,
     target: &Path,
@@ -41,15 +114,16 @@ pub(crate) fn paths(
     names
         .iter()
         .map(|name| {
+            let directory = disposal_directory(name.as_bytes());
             if tree
                 .keys()
                 .map(String::as_str)
                 .chain(index.iter().map(String::as_str))
-                .any(|p| p.starts_with(name) || p == name.trim_end_matches('/'))
+                .any(|p| contains_source(directory, p.as_bytes()))
             {
                 return Err(format!("disposal directory contains tracked paths: {name}"));
             }
-            let path = no_symlink_parents(target, name.trim_end_matches('/'))?;
+            let path = no_symlink_parents(target, &name[..directory.len()])?;
             match fs::symlink_metadata(&path) {
                 Ok(m) if m.is_dir() => Ok(path),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(path),
@@ -60,6 +134,7 @@ pub(crate) fn paths(
         .collect()
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Default, serde::Serialize)]
 pub struct ArtifactFootprint {
     pub file_entries: u64,
@@ -67,6 +142,7 @@ pub struct ArtifactFootprint {
     pub allocated_bytes: Option<u64>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn measure(root: &Path, allow_sockets: bool) -> Result<(ArtifactFootprint, u64), String> {
     let mut pending = vec![root.to_owned()];
     let mut footprint = ArtifactFootprint::default();
@@ -112,14 +188,17 @@ fn measure(root: &Path, allow_sockets: bool) -> Result<(ArtifactFootprint, u64),
     Ok((footprint, sockets))
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub fn artifact_footprint(path: &Path) -> Result<ArtifactFootprint, String> {
     measure(path, false).map(|(footprint, _)| footprint)
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn observed_artifact_footprint(path: &Path) -> Result<(ArtifactFootprint, u64), String> {
     measure(path, true)
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn identity(path: &Path) -> Result<String, String> {
     let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
     let kind = metadata.file_type();
@@ -135,6 +214,7 @@ pub(crate) fn identity(path: &Path) -> Result<String, String> {
     Ok(format!("{}:{}:{label}", metadata.dev(), metadata.ino()))
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn dispose_entry(
     root: &Path,
     relative: &str,
@@ -171,12 +251,14 @@ pub(crate) fn dispose_entry(
     .map_err(|error| error.to_string())
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn publish_entry(source: &Path, destination: &Path) -> Result<(), String> {
     use rustix::fs::{CWD, RenameFlags, renameat_with};
     renameat_with(CWD, source, CWD, destination, RenameFlags::NOREPLACE)
         .map_err(|error| error.to_string())
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn source_safe(r: &mut Runner, root: &Path, relative: &str) -> Result<(), String> {
     relative_path(relative)?;
     match fs::symlink_metadata(root.join(".git")) {
@@ -188,26 +270,24 @@ pub(crate) fn source_safe(r: &mut Runner, root: &Path, relative: &str) -> Result
     let tracked = r.literal_inventory(
         root,
         &["--literal-pathspecs", "ls-files", "-z", "--", relative],
-    )?;
-    if !tracked.is_empty()
-        || !r
-            .literal_inventory(
-                root,
-                &[
-                    "--literal-pathspecs",
-                    "diff",
-                    "--cached",
-                    "--name-only",
-                    "-z",
-                    "--no-renames",
-                    "--ignore-submodules=none",
-                    "--diff-filter=D",
-                    "--",
-                    relative,
-                ],
-            )?
-            .is_empty()
-    {
+    );
+    if inventory_contains_source(tracked, || {
+        r.literal_inventory(
+            root,
+            &[
+                "--literal-pathspecs",
+                "diff",
+                "--cached",
+                "--name-only",
+                "-z",
+                "--no-renames",
+                "--ignore-submodules=none",
+                "--diff-filter=D",
+                "--",
+                relative,
+            ],
+        )
+    })? {
         return Err(format!(
             "retained output contains committed/index source: {relative}"
         ));
@@ -215,6 +295,7 @@ pub(crate) fn source_safe(r: &mut Runner, root: &Path, relative: &str) -> Result
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn dispose(
     target: &Path,
     names: &[String],

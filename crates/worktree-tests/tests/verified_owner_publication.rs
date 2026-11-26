@@ -18,6 +18,51 @@ mod release_observation;
 
 verus! {
 
+fn expect_protected(value: bool)
+    requires value,
+{
+    if !value { panic!(); }
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn registered_directory_matches_whole_git_components() {
+    broadcast use vstd::array::group_array_axioms;
+    // "a//" names the same physical directory as "a/".
+    let name = policy::disposal_directory(&[97u8, 47, 47]);
+    assert(name@ =~= seq![97u8]);
+    let exact = policy::contains_source(name, &[97u8]);
+    let member = policy::contains_source(name, &[97u8, 47, 98]);
+    let similar = policy::contains_source(name, &[97u8, 98]);
+    let other = policy::contains_source(name, &[98u8]);
+    let shorter = policy::contains_source(&[97u8, 98], &[97u8]);
+    let ordinary = policy::disposal_directory(&[97u8, 98]);
+    let file = policy::contains_source(ordinary, &[97u8, 98]);
+    expect_protected(exact && member && !similar && !other && !shorter && file);
+}
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn git_inventory_preserves_source_and_original_errors() {
+    let unused = || -> (data: Result<Vec<u8>, u8>)
+        requires false,
+    { if true { panic!(); } Err(9u8) };
+    let failed_index = policy::inventory_contains_source(Err(7u8), unused);
+    expect_protected(matches!(failed_index, Err(7u8)));
+    let indexed = policy::inventory_contains_source(Ok(vec![0u8]), unused);
+    expect_protected(matches!(indexed, Ok(true)));
+    let deleted = policy::inventory_contains_source(Ok(vec![]),
+        || -> (data: Result<Vec<u8>, u8>) ensures data is Ok && data->Ok_0@.len() == 1,
+        { Ok(vec![0xffu8]) });
+    expect_protected(matches!(deleted, Ok(true)));
+    let clear = policy::inventory_contains_source(Ok(vec![]),
+        || -> (data: Result<Vec<u8>, u8>) ensures data is Ok && data->Ok_0@.len() == 0,
+        { Ok(vec![]) });
+    expect_protected(matches!(clear, Ok(false)));
+    let failed_deletion = policy::inventory_contains_source(Ok(vec![]),
+        || -> (data: Result<Vec<u8>, u8>) ensures data == Err::<Vec<u8>, u8>(8u8),
+        { Err(8u8) });
+    expect_protected(matches!(failed_deletion, Err(8u8)));
+}
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn release_accepts_the_expected_observations_only() {
     let accepted = release_observation::accepts(true, true);
