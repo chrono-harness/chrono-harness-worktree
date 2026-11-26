@@ -1,4 +1,4 @@
-_commit: v0.1.39
+_commit: v0.1.48
 _src_path: gh:chrono-harness/chrono-harness-copier
 dev_branch: dev
 features:
@@ -36,3 +36,7 @@ dependabot_auto_merge: true
 dependabot_updates:
 - {"package-ecosystem": "github-actions", "directory": "/", "schedule": {"interval": "daily"}, "groups": {"github-actions": {"patterns": ["*"]}}}
 - {"package-ecosystem": "cargo", "schedule": {"interval": "daily"}, "groups": {"cargo": {"patterns": ["*"], "exclude-patterns": ["vstd", "verus_*"]}, "verus": {"patterns": ["vstd", "verus_*"]}}, "directories": ["/crates/worktree", "/crates/worktree-tests"]}
+install_resolver_artifact: {"version": "0.1.1-alpha.2", "linux_sha256": "8fd9f01086ad928167f2a6a0db1f6277ffc9c60cbfaf5b1994de946044040058", "macos_sha256": "ff5dd4a2943b672b7fd2f1450c4a1e27dd181cbefe12536c92c75a06dd84d63e"}
+strict_host_adapters:
+  verus_macro_crate: vstd
+roadmap_actions_lock: true
