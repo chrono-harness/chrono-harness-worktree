@@ -23,6 +23,7 @@
       ".config/mise/conf.d/chrono-harness.toml",
       ".chrono-harness/ci/install.sh",
       ".github/workflows/check.yml",
+      ".github/workflows/actions.lock",
       ".chrono-harness/cleanup.json"
     ],
     "operation_timeout_seconds": 600,
