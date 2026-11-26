@@ -6,6 +6,8 @@ permissions:
   contents: read
 jobs:
   source:
+    outputs:
+      prerelease: ${{ steps.tag.outputs.prerelease }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -13,17 +15,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Verify release branch
+        id: tag
         shell: bash
         run: |
           set -euo pipefail
           directory=$(mktemp -d "$RUNNER_TEMP/tag-check.XXXXXXXX")
           trap 'rm -rf -- "$directory"' EXIT
           curl --fail --silent --show-error --location \
-            'https://github.com/chrono-harness/chrono-harness-host-release/releases/download/v0.1.0-alpha.21/chrono-host-release-linux-x86_64' \
+            'https://github.com/chrono-harness/chrono-harness-host-release/releases/download/v0.1.3/chrono-host-release-linux-x86_64' \
             --output "$directory/chrono-host-release"
-          (cd "$directory" && echo '53f966841373df821abf14eb726907ed2c6192bf948e8743fa4952e0818fd5e3  chrono-host-release' | sha256sum --check --status)
+          (cd "$directory" && echo '96dd49fd2c6ad7bac8938ac351459e9b8751f7c917a7239e15994b26771a9a4e  chrono-host-release' | sha256sum --check --status)
           chmod 700 "$directory/chrono-host-release"
-          "$directory/chrono-host-release" check-pushed-tag "$GITHUB_REF_NAME"
+          prerelease=$("$directory/chrono-host-release" check-pushed-tag "$GITHUB_REF_NAME" --prerelease)
+          printf 'prerelease=%s\n' "$prerelease" >> "$GITHUB_OUTPUT"
   build:
     needs: source
     strategy:
@@ -59,7 +63,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
   publish:
-    needs: build
+    needs: [source, build]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -72,12 +76,11 @@ jobs:
         working-directory: ${{ runner.temp }}/dist
         env:
           GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.source.outputs.prerelease }}
         shell: bash
         run: |
           set -euo pipefail
           sha256sum chrono-worktree-macos-aarch64 chrono-worktree-linux-x86_64 > SHA256SUMS
-          flags=()
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}" \
+            --title "$GITHUB_REF_NAME" --generate-notes --prerelease="$PRERELEASE" \
             chrono-worktree-macos-aarch64 chrono-worktree-linux-x86_64 SHA256SUMS
