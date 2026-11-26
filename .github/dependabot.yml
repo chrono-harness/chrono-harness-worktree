@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - directory: /
+    groups:
+      github-actions:
+        patterns:
+        - '*'
+    package-ecosystem: github-actions
+    schedule:
+      interval: daily
+    target-branch: dev
+  - directories:
+    - /crates/worktree
+    - /crates/worktree-tests
+    groups:
+      cargo:
+        patterns:
+        - '*'
+    package-ecosystem: cargo
+    schedule:
+      interval: daily
+    target-branch: dev
