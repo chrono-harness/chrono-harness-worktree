@@ -22,6 +22,7 @@ test = false
 bench = false
 
 [dependencies]
+hex = "0.4"
 serde_yaml_ng = "=0.10.0"
 litrs = "=1.0.1"
 rustix = { version = "1", features = ["fs", "net"] }

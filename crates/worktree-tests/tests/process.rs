@@ -8,7 +8,7 @@ use std::{
 };
 
 fn digest(raw: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(raw))
+    hex::encode(Sha256::digest(raw))
 }
 fn run(
     root: &Path,

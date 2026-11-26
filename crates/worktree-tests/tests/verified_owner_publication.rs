@@ -508,7 +508,7 @@ fn final_publication_requires_exact_installed_payload_and_retained_original() {
 fn deployed_roadmap_and_tool_selection_match_the_host_template() {
     use sha2::{Digest, Sha256};
     let (roadmap, workflow, selection, installer) = deployed_inputs();
-    let digest = |source: &str| format!("{:x}", Sha256::digest(source.as_bytes()));
+    let digest = |source: &str| hex::encode(Sha256::digest(source.as_bytes()));
     assert!(matches_host_template(
         &digest(roadmap),
         &digest(workflow),

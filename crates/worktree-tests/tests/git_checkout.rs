@@ -129,7 +129,7 @@ fn checkout_protects_unmerged_staged_and_changed_physical_objects() {
     fs::remove_file(&path).unwrap();
     symlink("outside", &path).unwrap();
     assert_eq!(changes(&original).unwrap(), ["file with spaces"]);
-    let target_hash = format!("{:x}", Sha256::digest(b"blob 7\0outside"));
+    let target_hash = hex::encode(Sha256::digest(b"blob 7\0outside"));
     let links =
         parse_tree(format!("120000 blob {target_hash}\tfile with spaces\0").as_bytes()).unwrap();
     let index = format!("120000 {target_hash} 0\tfile with spaces\0");

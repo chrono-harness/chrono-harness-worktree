@@ -9,7 +9,7 @@ const SLOT: &str = ".chrono-harness/state/bootstrap-owner-current.json";
 const RECEIPT: &str = ".chrono-harness/state/automatic-cleanup-v2/owner-adoption.json";
 
 fn digest(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 
 fn binding(path: &Path) -> Value {

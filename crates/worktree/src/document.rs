@@ -2,7 +2,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 pub(crate) fn sha256(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 
 /// Canonical JSON is part of the on-disk worktree registration and receipt identity.
@@ -104,7 +104,7 @@ pub(crate) fn copy_hashed(
         digest.update(&buffer[..n]);
         length = length.checked_add(n as u64).ok_or("file length overflow")?;
     }
-    Ok((format!("{:x}", digest.finalize()), length))
+    Ok((hex::encode(digest.finalize()), length))
 }
 pub(crate) fn file_identity(path: &Path) -> Result<(String, u64), String> {
     let metadata = fs::metadata(path).map_err(|e| format!("{}: {e}", path.display()))?;
