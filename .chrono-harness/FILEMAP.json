@@ -70,7 +70,11 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".chrono-harness/install-tools.sh",
@@ -82,7 +86,16 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
     },
     {
       "path": ".chrono-harness/judges.json",
@@ -117,7 +130,11 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".chrono-harness/workflow.json",
@@ -131,7 +148,11 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".config/mise/conf.d/.gitignore",
@@ -150,7 +171,11 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".config/mise/conf.d/selected-chrono-harness.toml",
@@ -162,7 +187,16 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
     },
     {
       "path": ".github/ISSUE_TEMPLATE/bug.yml",
@@ -224,14 +258,32 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
     },
     {
       "path": ".github/workflows/issue-roadmap.yml",
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
     },
     {
       "path": ".github/workflows/check.yml",
