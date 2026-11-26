@@ -29,3 +29,6 @@ repository: chrono-harness/chrono-harness-worktree
 required_check: check
 tool_install_channels: pinned
 tool_versions: {}
+manage_roadmap: true
+publisher_workflow: Release chrono-worktree
+host_release_artifact: {"version": "0.1.1", "linux_sha256": "8fd9f01086ad928167f2a6a0db1f6277ffc9c60cbfaf5b1994de946044040058", "macos_sha256": "ff5dd4a2943b672b7fd2f1450c4a1e27dd181cbefe12536c92c75a06dd84d63e"}
