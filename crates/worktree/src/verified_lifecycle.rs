@@ -6,6 +6,12 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 #[cfg(verus_keep_ghost)]
+#[path = "automatic/standalone_expiry.rs"]
+mod standalone_expiry;
+#[cfg(verus_keep_ghost)]
+pub use standalone_expiry::report_owner_matches;
+
+#[cfg(verus_keep_ghost)]
 #[path = "remote.rs"]
 pub mod remote;
 #[cfg(not(verus_keep_ghost))]
