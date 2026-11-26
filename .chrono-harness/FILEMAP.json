@@ -37,7 +37,11 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".chrono-harness/ci/install.sh",
@@ -56,7 +60,11 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".chrono-harness/cleanup.json",
@@ -280,7 +288,12 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": [],
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
       "verification": {
         "role": "program",
         "roots": [
@@ -296,7 +309,33 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": [],
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/actions.lock",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
       "verification": {
         "role": "program",
         "roots": [
@@ -317,7 +356,11 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".github/workflows/release.yml",
@@ -836,6 +879,27 @@
     },
     {
       "path": "crates/worktree-tests/examples/release_observation.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": ".chrono-harness/ci/roadmap.rs",
       "owner": "worktree-tests",
       "surface": "test",
       "cost": "unmeasured",
