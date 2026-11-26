@@ -14,8 +14,15 @@ updates:
     - /crates/worktree-tests
     groups:
       cargo:
+        exclude-patterns:
+        - vstd
+        - verus_*
         patterns:
         - '*'
+      verus:
+        patterns:
+        - vstd
+        - verus_*
     package-ecosystem: cargo
     schedule:
       interval: daily
