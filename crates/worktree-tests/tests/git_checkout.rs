@@ -1,16 +1,32 @@
+#![allow(unexpected_cfgs)]
+#[cfg(verus_keep_ghost)]
+use super::policy;
+#[cfg(not(verus_keep_ghost))]
+use chrono_worktree::verified_lifecycle as policy;
+use vstd::prelude::*;
+#[cfg(verus_keep_ghost)]
+use vstd::vpanic as panic;
+
+#[cfg(not(verus_keep_ghost))]
 use chrono_worktree::facts::{
     acquire_immutable_input, acquire_registry_blobs, checkout_changes, parse_tree,
 };
+#[cfg(not(verus_keep_ghost))]
 use sha2::{Digest, Sha256};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     fs,
     os::unix::fs::{PermissionsExt, symlink},
 };
+#[cfg(not(verus_keep_ghost))]
 const COMMIT: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+#[cfg(not(verus_keep_ghost))]
 const EMPTY: &str = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391";
+#[cfg(not(verus_keep_ghost))]
 const CONTENT: &str = "ce013625030ba8dba906f756967f9e9ca394464a";
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn immutable_reads_verify_exact_git_identity_and_keep_data_limit_separate() {
     let mut calls = 0;
     let run = acquire_immutable_input(COMMIT, "a file", 6, |argv, stdin, limit| {
@@ -53,6 +69,7 @@ fn immutable_reads_verify_exact_git_identity_and_keep_data_limit_separate() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn registration_batches_reject_wrong_count_body_and_framing() {
     let paths = ["one", "two", "three"].map(String::from);
     let header = format!("{EMPTY} blob 0\n");
@@ -102,6 +119,7 @@ fn registration_batches_reject_wrong_count_body_and_framing() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn checkout_protects_unmerged_staged_and_changed_physical_objects() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("file with spaces");
@@ -129,7 +147,7 @@ fn checkout_protects_unmerged_staged_and_changed_physical_objects() {
     fs::remove_file(&path).unwrap();
     symlink("outside", &path).unwrap();
     assert_eq!(changes(&original).unwrap(), ["file with spaces"]);
-    let target_hash = format!("{:x}", Sha256::digest(b"blob 7\0outside"));
+    let target_hash = hex::encode(Sha256::digest(b"blob 7\0outside"));
     let links =
         parse_tree(format!("120000 blob {target_hash}\tfile with spaces\0").as_bytes()).unwrap();
     let index = format!("120000 {target_hash} 0\tfile with spaces\0");
@@ -141,6 +159,7 @@ fn checkout_protects_unmerged_staged_and_changed_physical_objects() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn separate_callers_share_reads_and_exclude_an_overlapping_write() {
     use chrono_worktree::conflicting_paths;
     use std::path::PathBuf;
@@ -196,6 +215,7 @@ fn separate_callers_share_reads_and_exclude_an_overlapping_write() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn observed_git_replies_control_dispatch_and_the_final_absence_receipt() {
     use chrono_worktree::verified_lifecycle::{RemoteCheck, RemoteSelection};
     use serde_json::json;
@@ -316,4 +336,15 @@ fn observed_git_replies_control_dispatch_and_the_final_absence_receipt() {
     result.unwrap();
     assert_eq!(pushes, 0);
     assert_eq!(report["remote_branch_removal"], "already-absent");
+}
+
+verus! {
+fn expect(value: bool) requires value { if !value { panic!(); } }
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn digest_stream_size_counts_the_last_bytes_without_wrapping() {
+    expect(matches!(policy::add_stream_bytes(7, 8), Some(15)));
+    expect(matches!(policy::add_stream_bytes(u64::MAX - 8, 8), Some(n) if n == u64::MAX));
+    expect(policy::add_stream_bytes(u64::MAX - 8, 9).is_none());
+}
 }

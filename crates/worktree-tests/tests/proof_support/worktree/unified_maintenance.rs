@@ -11,12 +11,7 @@ use vstd::vpanic as panic;
 
 verus! {
 fn expect(actual: bool) requires actual { if !actual { panic!(); } }
-#[cfg_attr(not(verus_keep_ghost), test)]
-fn maintenance_selects_a_round_only_for_received_events() {
-    expect(!policy::maintenance_has_events(0));
-    expect(policy::maintenance_has_events(1));
-    expect(policy::maintenance_has_events(64));
-}
+
 
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn maintenance_keeps_coordinator_and_invoking_roots_in_order() {

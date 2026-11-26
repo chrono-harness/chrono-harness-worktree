@@ -1,15 +1,30 @@
+#![allow(unexpected_cfgs)]
+#[cfg(verus_keep_ghost)]
+use super::policy;
+#[cfg(not(verus_keep_ghost))]
+use chrono_worktree::verified_lifecycle as policy;
+use vstd::prelude::*;
+#[cfg(verus_keep_ghost)]
+use vstd::vpanic as panic;
+
+#[cfg(not(verus_keep_ghost))]
 use chrono_worktree::process::{CommandSpec, run_process_observed_data};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use sha2::{Digest, Sha256};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::BTreeMap,
     path::Path,
     time::{Duration, Instant},
 };
 
+#[cfg(not(verus_keep_ghost))]
 fn digest(raw: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(raw))
+    hex::encode(Sha256::digest(raw))
 }
+#[cfg(not(verus_keep_ghost))]
 fn run(
     root: &Path,
     argv: Vec<String>,
@@ -36,6 +51,7 @@ fn run(
     Ok((serde_json::to_value(&receipt).unwrap(), receipt.compact()?))
 }
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn bounded_process_records_raw_streams_actual_pid_and_checked_compaction() {
     let dir = tempfile::tempdir().unwrap();
     let input = [0, 1, 0xff, 0, 10];
@@ -67,6 +83,7 @@ fn bounded_process_records_raw_streams_actual_pid_and_checked_compaction() {
     assert!(run(dir.path(), vec!["streams".into()], &input, 8, 2, 5, true).is_err());
 }
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn timeout_and_output_limit_leave_partial_results_and_reap_the_child() {
     let dir = tempfile::tempdir().unwrap();
     let (p, _) = run(dir.path(), vec!["burst".into()], b"", 8, 8, 4, false).unwrap();
@@ -81,6 +98,7 @@ fn timeout_and_output_limit_leave_partial_results_and_reap_the_child() {
     assert_eq!(p["owned_work_joined"], true);
 }
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn child_reaping_alone_never_marks_inherited_native_work_joined() {
     let dir = tempfile::tempdir().unwrap();
     let marker = dir.path().join("child-did-finish");
@@ -101,6 +119,7 @@ fn child_reaping_alone_never_marks_inherited_native_work_joined() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn registration_receives_only_the_selected_nested_tool_path() {
     let root = tempfile::tempdir().unwrap();
     let program = env!("CARGO_BIN_EXE_mock-worktree-child");
@@ -130,6 +149,7 @@ fn registration_receives_only_the_selected_nested_tool_path() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn maintenance_records_failure_and_still_runs_later_host_operations() {
     let dir = tempfile::tempdir().unwrap();
     std::os::unix::fs::symlink(
@@ -169,6 +189,7 @@ fn maintenance_records_failure_and_still_runs_later_host_operations() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn socket_batches_events_and_retains_new_events_after_owner_failure() {
     use std::os::unix::net::UnixDatagram;
     let (executor, sender) = UnixDatagram::pair().unwrap();
@@ -195,6 +216,7 @@ fn socket_batches_events_and_retains_new_events_after_owner_failure() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn activated_service_preserves_queue_while_competing_for_the_same_lease() {
     use std::{fs, os::unix::net::UnixDatagram, sync::mpsc, thread};
     // Unix socket names must fit sockaddr_un on both supported kernels.
@@ -269,6 +291,7 @@ fn activated_service_preserves_queue_while_competing_for_the_same_lease() {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn socket_starts_a_second_round_for_the_sixty_fifth_queued_hint() {
     use std::os::unix::net::UnixDatagram;
     let (executor, sender) = UnixDatagram::pair().unwrap();
@@ -284,4 +307,15 @@ fn socket_starts_a_second_round_for_the_sixty_fifth_queued_hint() {
     })
     .unwrap();
     assert_eq!(rounds, 2);
+}
+
+verus! {
+fn expect(value: bool) requires value { if !value { panic!(); } }
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn maintenance_selects_a_round_only_for_received_events() {
+    expect(!policy::maintenance_has_events(0));
+    expect(policy::maintenance_has_events(1));
+    expect(policy::maintenance_has_events(64));
+}
 }

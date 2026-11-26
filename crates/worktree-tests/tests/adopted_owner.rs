@@ -1,23 +1,43 @@
+#![allow(unexpected_cfgs)]
+#[cfg(verus_keep_ghost)]
+use super::policy;
+#[cfg(not(verus_keep_ghost))]
+use chrono_worktree::verified_owner_publication as policy;
+use vstd::prelude::*;
+#[cfg(verus_keep_ghost)]
+use vstd::vpanic as panic;
+
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use sha2::{Digest, Sha256};
+#[cfg(not(verus_keep_ghost))]
 use std::{fs, os::unix::fs::MetadataExt, path::Path};
+#[cfg(not(verus_keep_ghost))]
 use tempfile::tempdir;
 
+#[cfg(not(verus_keep_ghost))]
 const SELECTED: &str = ".chrono-harness/bin/chrono-worktree";
+#[cfg(not(verus_keep_ghost))]
 const STAGED: &str = ".chrono-harness/bin/owner-stages/test/chrono-worktree";
+#[cfg(not(verus_keep_ghost))]
 const SLOT: &str = ".chrono-harness/state/bootstrap-owner-current.json";
+#[cfg(not(verus_keep_ghost))]
 const RECEIPT: &str = ".chrono-harness/state/automatic-cleanup-v2/owner-adoption.json";
 
+#[cfg(not(verus_keep_ghost))]
 fn digest(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn binding(path: &Path) -> Value {
     let metadata = fs::metadata(path).unwrap();
     json!({"identity":format!("{}:{}",metadata.dev(),metadata.ino()),
            "sha256":digest(&fs::read(path).unwrap()),"size":metadata.len()})
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn record(root: &Path, adoption: &Value) {
     let bytes = serde_json::to_vec(adoption).unwrap();
     fs::write(root.join(RECEIPT), &bytes).unwrap();
@@ -27,6 +47,7 @@ fn record(root: &Path, adoption: &Value) {
 }
 
 #[test]
+#[cfg(not(verus_keep_ghost))]
 fn reads_only_a_complete_unchanged_publication() {
     let temp = tempdir().unwrap();
     let root = temp.path().canonicalize().unwrap();
@@ -90,4 +111,20 @@ fn reads_only_a_complete_unchanged_publication() {
     fs::write(root.join(SELECTED), b"replaced").unwrap();
     assert_eq!(query(&["--if-installed"]).stdout.trim(), "null");
     assert_eq!(query(&[]).exit_code, 2);
+}
+
+verus! {
+fn expect(value: bool) requires value { if !value { panic!(); } }
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn intent_presence_handles_first_publication_reentry_and_orphan_preparation() {
+    let first = policy::intent_action(false, false);
+    expect(matches!(first, policy::IntentAction::Prepare));
+    let orphan = policy::intent_action(false, true);
+    expect(matches!(orphan, policy::IntentAction::Reject));
+    let prepared = policy::intent_action(true, true);
+    expect(matches!(prepared, policy::IntentAction::Read));
+    let published = policy::intent_action(true, false);
+    expect(matches!(published, policy::IntentAction::Read));
+}
 }
