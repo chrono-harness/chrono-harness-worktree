@@ -414,7 +414,11 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "crates/worktree-tests/tests/adopted_owner.rs",
