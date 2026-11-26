@@ -1,4 +1,5 @@
 {
+  "require_new_file_classification": true,
   "schema_version": 2,
   "status": "proposed",
   "files": [
@@ -14,14 +15,22 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".chrono-harness/USAGE.md",
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".chrono-harness/ci/check.json",
@@ -160,35 +169,55 @@
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".github/ISSUE_TEMPLATE/documentation.yml",
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".github/ISSUE_TEMPLATE/enhancement.yml",
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".github/ISSUE_TEMPLATE/question.yml",
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".github/PULL_REQUEST_TEMPLATE.md",
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".github/roadmap.cjs",
@@ -236,21 +265,33 @@
       "surface": "documentation",
       "cost": "unmeasured",
       "edges": [],
-      "symlink": "CLAUDE.md"
+      "symlink": "CLAUDE.md",
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "CLAUDE.md",
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "README.md",
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "check.sh",
@@ -1536,14 +1577,22 @@
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "docs/licenses/trureturing-Apache-2.0.txt",
       "owner": "host",
       "surface": "documentation",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": "rust-toolchain.toml",
