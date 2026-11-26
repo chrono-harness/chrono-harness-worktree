@@ -191,6 +191,20 @@
       "edges": []
     },
     {
+      "path": ".github/roadmap.cjs",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
+      "path": ".github/workflows/issue-roadmap.yml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": []
+    },
+    {
       "path": ".github/workflows/check.yml",
       "owner": "host",
       "surface": "product",
