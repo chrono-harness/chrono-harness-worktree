@@ -1,11 +1,80 @@
 //! Concurrent managed commands declare the checkout paths, index and refs they use.
 //! Each live declaration is protected by an inherited kernel capability.
+use vstd::prelude::*;
+
+verus! {
+
+/// Observe each pair until the first overlapping pair, or exhaust both lists.
+fn any_overlap<T, F: Fn(&T, &T) -> bool>(left: &[T], right: &[T], overlap: &F) -> (found: bool)
+    requires forall|a: &T, b: &T| #[trigger] overlap.requires((a, b)),
+    ensures
+        found ==> exists|i: int, j: int| 0 <= i < left.len() && 0 <= j < right.len()
+            && #[trigger] overlap.ensures((&left@[i], &right@[j]), true),
+        !found ==> forall|i: int, j: int| 0 <= i < left.len() && 0 <= j < right.len()
+            ==> #[trigger] overlap.ensures((&left@[i], &right@[j]), false),
+{
+    let mut i = 0;
+    while i < left.len()
+        invariant i <= left.len(),
+            forall|a: &T, b: &T| #[trigger] overlap.requires((a, b)),
+            forall|k: int, l: int| 0 <= k < i && 0 <= l < right.len()
+                ==> #[trigger] overlap.ensures((&left@[k], &right@[l]), false),
+        decreases left.len() - i,
+    {
+        let mut j = 0;
+        while j < right.len()
+            invariant i < left.len(), j <= right.len(),
+                forall|a: &T, b: &T| #[trigger] overlap.requires((a, b)),
+                forall|l: int| 0 <= l < j ==> #[trigger] overlap.ensures((&left@[i as int], &right@[l]), false),
+            decreases right.len() - j,
+        {
+            if overlap(&left[i], &right[j]) {
+                assert(overlap.ensures((&left@[i as int], &right@[j as int]), true));
+                return true;
+            }
+            j += 1;
+        }
+        i += 1;
+    }
+    false
+}
+
+pub open spec fn witnessed<T, F: Fn(&T, &T) -> bool>(left: Seq<T>, right: Seq<T>, overlap: F) -> bool {
+    exists|i: int, j: int| 0 <= i < left.len() && 0 <= j < right.len()
+        && #[trigger] overlap.ensures((&left[i], &right[j]), true)
+}
+
+pub open spec fn disjoint<T, F: Fn(&T, &T) -> bool>(left: Seq<T>, right: Seq<T>, overlap: F) -> bool {
+    forall|i: int, j: int| 0 <= i < left.len() && 0 <= j < right.len()
+        ==> #[trigger] overlap.ensures((&left[i], &right[j]), false)
+}
+
+/// Path component comparison is supplied by the native adapter for the two resolved paths.
+pub fn conflicting_resources<T, F: Fn(&T, &T) -> bool>(
+    reads: &[T], writes: &[T], other_reads: &[T], other_writes: &[T], overlap: F,
+) -> (conflicts: bool)
+    requires forall|a: &T, b: &T| #[trigger] overlap.requires((a, b)),
+    ensures conflicts ==> witnessed(writes@, other_reads@, overlap)
+             || witnessed(writes@, other_writes@, overlap) || witnessed(other_writes@, reads@, overlap),
+        !conflicts ==> disjoint(writes@, other_reads@, overlap)
+             && disjoint(writes@, other_writes@, overlap) && disjoint(other_writes@, reads@, overlap),
+{
+    any_overlap(writes, other_reads, &overlap)
+        || any_overlap(writes, other_writes, &overlap)
+        || any_overlap(other_writes, reads, &overlap)
+}
+
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::{
     document::{no_symlink_parents, relative_path},
     ownership::{DirectoryLease, Lease},
     start::CheckoutIdentity,
 };
+#[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::BTreeMap,
     fs,
@@ -15,6 +84,7 @@ use std::{
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg(not(verus_keep_ghost))]
 pub(super) struct Scope {
     pub reads: Vec<String>,
     pub writes: Vec<String>,
@@ -22,6 +92,7 @@ pub(super) struct Scope {
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg(not(verus_keep_ghost))]
 struct Claim {
     operation: String,
     token: String,
@@ -29,6 +100,7 @@ struct Claim {
     writes: Vec<PathBuf>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn resolve(checkout: &CheckoutIdentity, resource: &str) -> Result<PathBuf, String> {
     match resource {
         "checkout" => Ok(checkout.top.clone()),
@@ -61,23 +133,19 @@ fn resolve(checkout: &CheckoutIdentity, resource: &str) -> Result<PathBuf, Strin
 
 /// Compare the actual resolved resources from two independently running commands.
 #[doc(hidden)]
+#[cfg(not(verus_keep_ghost))]
 pub fn conflicting_paths(
     reads: &[PathBuf],
     writes: &[PathBuf],
     other_reads: &[PathBuf],
     other_writes: &[PathBuf],
 ) -> bool {
-    let overlap = |left: &Path, right: &Path| left.starts_with(right) || right.starts_with(left);
-    writes.iter().any(|p| {
-        other_reads
-            .iter()
-            .chain(other_writes)
-            .any(|q| overlap(p, q))
-    }) || other_writes
-        .iter()
-        .any(|p| reads.iter().any(|q| overlap(p, q)))
+    conflicting_resources(reads, writes, other_reads, other_writes, |left, right| {
+        left.starts_with(right) || right.starts_with(left)
+    })
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Claim {
     fn resolve(
         operation: &str,
@@ -111,10 +179,12 @@ impl Claim {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn record_name(bytes: &[u8]) -> String {
     format!("use-{}.json", crate::document::sha256(bytes))
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn sweep(dir: &Path, requested: Option<&Claim>) -> Result<usize, String> {
     let mut expired = 0;
     let pending = dir.join("publishing");
@@ -166,12 +236,14 @@ fn sweep(dir: &Path, requested: Option<&Claim>) -> Result<usize, String> {
     Ok(expired)
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(super) struct Active {
     directory: PathBuf,
     path: PathBuf,
     lease: Option<Lease>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Drop for Active {
     fn drop(&mut self) {
         let Some(owned) = self.lease.take() else {
@@ -180,15 +252,19 @@ impl Drop for Active {
         let identity = owned.id().to_owned();
         drop(owned);
         // A surviving child can still hold the inode after the launcher returns.
-        if let Ok(Some(_gate)) = DirectoryLease::acquire(&self.directory, true, None)
-            && let Ok(Some(lease)) = Lease::acquire(&self.path, Some(&identity), false, true, None)
-            && lease.stable().is_ok()
-        {
+        let Ok(Some(_gate)) = DirectoryLease::acquire(&self.directory, true, None) else {
+            return;
+        };
+        let Ok(Some(lease)) = Lease::acquire(&self.path, Some(&identity), false, true, None) else {
+            return;
+        };
+        if lease.stable().is_ok() {
             let _ = fs::remove_file(&self.path);
         }
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(super) fn enter(
     directory: &Path,
     registered: &BTreeMap<String, Scope>,
@@ -228,6 +304,7 @@ pub(super) fn enter(
     }))
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(super) fn cleanup(directory: &Path) -> Result<usize, String> {
     let dir = directory.join("operation-scopes");
     match fs::symlink_metadata(&dir) {
