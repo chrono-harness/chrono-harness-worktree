@@ -11,17 +11,9 @@ if [ "${CHRONO_TOOL_CHANNEL+x}" = x ]; then
                fail 'CHRONO_TOOL_CHANNEL expects stable, preview or an exact v tag.' ;;
     esac
 fi
-select_tool() {
-    selector=${CHRONO_TOOL_CHANNEL:-}
-    [ -z "$selector" ] || return 0
-    case "$1" in
-
-        *) selector='pinned' ;;
-    esac
-}
 case "$(uname -s)-$(uname -m)" in
-    Linux-x86_64) platform=linux-x64; asset=linux-x86_64; seed_sha=271e79ab48a9c7442c8edc1d404e44430711ac486893240246f754255839b785 ;;
-    Darwin-arm64) platform=macos-arm64; asset=macos-aarch64; seed_sha=7a7ac849578b7d53b98baaa7396b4273a97c9a4a9eb4998607681fb769f1a692 ;;
+    Linux-x86_64) platform=linux-x64; asset=linux-x86_64; seed_sha=8fd9f01086ad928167f2a6a0db1f6277ffc9c60cbfaf5b1994de946044040058 ;;
+    Darwin-arm64) platform=macos-arm64; asset=macos-aarch64; seed_sha=ff5dd4a2943b672b7fd2f1450c4a1e27dd181cbefe12536c92c75a06dd84d63e ;;
     *) fail 'Unsupported installation platform.' ;;
 esac
 verify() {
@@ -44,20 +36,41 @@ disabled=$(mise settings get disable_tools)
 enabled() {
     case "$disabled" in *\"http:$1\"*) return 1 ;; *) return 0 ;; esac
 }
-resolved=$config_dir/zz-chrono-harness-resolved.toml
-export MISE_IGNORED_CONFIG_PATHS="${MISE_IGNORED_CONFIG_PATHS:+$MISE_IGNORED_CONFIG_PATHS:}$resolved"
+legacy=$config_dir/zz-chrono-harness-resolved.toml
+projection=$config_dir/selected-chrono-harness.toml
+state=$PWD/.chrono-harness/state
+selection=$state/tool-selection
+resolved=$selection/versions.toml
+data=$work/versions.toml
+: > "$data"
+validate_target() {
+    for dir in "$PWD/.chrono-harness" "$state" "$selection"; do
+        if [ -L "$dir" ] || { [ -e "$dir" ] && [ ! -d "$dir" ]; }; then
+            fail "Expected an installation state directory: $dir"
+        fi
+    done
+    for file in "$legacy" "$resolved"; do
+        if [ -L "$file" ] || { [ -e "$file" ] && [ ! -f "$file" ]; }; then
+            fail "Expected a regular installation selection: $file"
+        fi
+    done
+    for entry in "$selection"/* "$selection"/.[!.]* "$selection"/..?*; do
+        if [ "$entry" != "$resolved" ] && { [ -e "$entry" ] || [ -L "$entry" ]; }; then
+            fail "Unexpected installation data entry: $entry"
+        fi
+    done
+}
+validate_target
+export MISE_IGNORED_CONFIG_PATHS="${MISE_IGNORED_CONFIG_PATHS:+$MISE_IGNORED_CONFIG_PATHS:}$legacy:$projection"
 export MISE_TRUSTED_CONFIG_PATHS="$work${MISE_TRUSTED_CONFIG_PATHS:+:$MISE_TRUSTED_CONFIG_PATHS}"
-while read -r command repository; do
-    enabled "$command" || continue
-    select_tool "$command"
-    [ "$selector" != pinned ] || continue
+resolve_dynamic() {
     if [ -z "$downloads" ]; then
         temp_parent=$(cd "${TMPDIR:-/tmp}" && pwd -P)
         case "$temp_parent/" in "$(pwd -P)/"*) temp_parent=/tmp ;; esac
         downloads=$(mktemp -d "$temp_parent/chrono-install.XXXXXXXX")
         seed=$downloads/chrono-host-release
         curl --disable --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
-            "https://github.com/chrono-harness/chrono-harness-host-release/releases/download/v0.1.0-alpha.29/chrono-host-release-$asset" -o "$seed"
+            "https://github.com/chrono-harness/chrono-harness-host-release/releases/download/v0.1.1-alpha.2/chrono-host-release-$asset" -o "$seed"
         verify "$seed" "$seed_sha"
         chmod 700 "$seed"
     fi
@@ -72,7 +85,9 @@ while read -r command repository; do
                 auth="Authorization: Bearer $GITHUB_TOKEN"
                 set -- "$@" -H @-
             fi
-            if curl "$@" -D "$pages/headers" -o "$pages/$page.json" \
+            # Fixed-width names preserve GitHub's order when the resolver receives the glob.
+            file=$(printf '%020d' "$page")
+            if curl "$@" -D "$pages/$file.headers" -o "$pages/$file.json" \
                 "https://api.github.com/repos/$repository/releases?per_page=100&page=$page" <<AUTH
 $auth
 AUTH
@@ -82,50 +97,77 @@ AUTH
                 echo "Failed to read releases for $repository (page $page)." >&2
                 exit "$fetch_status"
             fi
-            # Fetch the next numbered page only when GitHub advertises it.
-            if grep -i '^link:' "$pages/headers" | grep -Fq 'rel="next"'; then page=$((page + 1))
-            else break; fi
+            state=$("$seed" resolve-install-v1 --page-state "$pages/$file.headers")
+            case "$state" in
+                next) page=$((page + 1)) ;;
+                done) break ;;
+                *) fail "Unexpected release page state: $state" ;;
+            esac
         done
     fi
     "$seed" resolve-install-v1 --mise-tool "$command" "$repository" "$selector" \
         "$command-linux-x86_64" "$command-macos-aarch64" "$pages"/*.json >> "$manifest"
-done <<'TOOLS'
-chrono-cache chrono-harness/chrono-harness-cache
-chrono-ci chrono-harness/chrono-harness-ci
-chrono-diagnostics chrono-harness/chrono-harness-diagnostics
-chrono-distribution chrono-harness/chrono-harness-distribution
-chrono-harness chrono-harness/chrono-harness-runner
-chrono-host-bootstrap chrono-harness/chrono-harness-host-bootstrap
-chrono-host-release chrono-harness/chrono-harness-host-release
-chrono-inputs chrono-harness/chrono-harness-inputs
-chrono-instructions chrono-harness/chrono-harness-instructions
-chrono-judge-ci chrono-harness/chrono-harness-judge-ci
-chrono-judge-cost chrono-harness/chrono-harness-judge-cost
-chrono-judge-filemap chrono-harness/chrono-harness-judge-filemap
-chrono-judge-mixed chrono-harness/chrono-harness-judge-mixed
-chrono-judge-projects chrono-harness/chrono-harness-judge-projects
-chrono-judge-registration chrono-harness/chrono-harness-judge-registration
-chrono-judge-routes chrono-harness/chrono-harness-judge-routes
-chrono-judge-workflow chrono-harness/chrono-harness-judge-workflow
-chrono-pr chrono-harness/chrono-harness-pr
-chrono-test-git chrono-harness/chrono-harness-test-git
-chrono-test-git-profile chrono-harness/chrono-harness-test-git
-chrono-worktree chrono-harness/chrono-harness-worktree
-TOOLS
-# The nested config takes precedence over any previous checkout receipt.
-# mise installs explicit versions and verifies fresh downloads. Also hash cache hits.
-mise -C "$work" install
-for command in chrono-cache chrono-ci chrono-diagnostics chrono-distribution chrono-harness chrono-host-bootstrap chrono-host-release chrono-inputs chrono-instructions chrono-judge-ci chrono-judge-cost chrono-judge-filemap chrono-judge-mixed chrono-judge-projects chrono-judge-registration chrono-judge-routes chrono-judge-workflow chrono-pr chrono-test-git chrono-test-git-profile chrono-worktree; do
+}
+# Resolve each enabled command once, then install and verify that exact selection.
+set --
+: > "$work/checksums"
+while read -r command repository default_selector; do
     enabled "$command" || continue
-    select_tool "$command"
-    source=$manifest
-    if [ "$selector" = pinned ]; then source=$config_dir/chrono-harness.toml; fi
+    selector=${CHRONO_TOOL_CHANNEL-$default_selector}
+    if [ "$selector" = pinned ]; then
+        source=$config_dir/chrono-harness.toml
+    else
+        resolve_dynamic
+        source=$manifest
+    fi
+    version=$(mise config get --file "$source" "tools.\"http:$command\".version")
     expected=$(mise config get --file "$source" "tools.\"http:$command\".platforms.$platform.checksum")
+    if [ "$selector" != pinned ]; then
+        case $platform in
+            linux-x64) linux=$expected; macos=$(mise config get --file "$source" "tools.\"http:$command\".platforms.macos-arm64.checksum") ;;
+            macos-arm64) macos=$expected; linux=$(mise config get --file "$source" "tools.\"http:$command\".platforms.linux-x64.checksum") ;;
+        esac
+        printf '%s = ["%s", "%s", "%s"]\n' "$command" "$version" "$linux" "$macos" >> "$data"
+    fi
+    set -- "$@" "http:$command@$version"
+    printf '%s %s\n' "$command" "$expected" >> "$work/checksums"
+done <<'TOOLS'
+chrono-cache chrono-harness/chrono-harness-cache pinned
+chrono-ci chrono-harness/chrono-harness-ci pinned
+chrono-diagnostics chrono-harness/chrono-harness-diagnostics pinned
+chrono-distribution chrono-harness/chrono-harness-distribution pinned
+chrono-harness chrono-harness/chrono-harness-runner pinned
+chrono-host-bootstrap chrono-harness/chrono-harness-host-bootstrap pinned
+chrono-host-release chrono-harness/chrono-harness-host-release pinned
+chrono-inputs chrono-harness/chrono-harness-inputs pinned
+chrono-instructions chrono-harness/chrono-harness-instructions pinned
+chrono-judge-ci chrono-harness/chrono-harness-judge-ci pinned
+chrono-judge-cost chrono-harness/chrono-harness-judge-cost pinned
+chrono-judge-filemap chrono-harness/chrono-harness-judge-filemap pinned
+chrono-judge-mixed chrono-harness/chrono-harness-judge-mixed pinned
+chrono-judge-projects chrono-harness/chrono-harness-judge-projects pinned
+chrono-judge-registration chrono-harness/chrono-harness-judge-registration pinned
+chrono-judge-routes chrono-harness/chrono-harness-judge-routes pinned
+chrono-judge-workflow chrono-harness/chrono-harness-judge-workflow pinned
+chrono-pr chrono-harness/chrono-harness-pr pinned
+chrono-test-git chrono-harness/chrono-harness-test-git pinned
+chrono-test-git-profile chrono-harness/chrono-harness-test-git pinned
+chrono-worktree chrono-harness/chrono-harness-worktree pinned
+TOOLS
+# An explicit mise argument installs the requested release even when a matching prerelease is cached.
+if [ "$#" -gt 0 ]; then mise -C "$work" install "$@"; fi
+# Install remaining host tools, including Rust and Verus where selected.
+mise -C "$work" install
+while read -r command expected; do
     executable=$(mise -C "$work" which "$command")
     verify "$executable" "${expected#sha256:}"
-done
-if [ -s "$manifest" ]; then
-    mv -f "$manifest" "$resolved"
+done < "$work/checksums"
+validate_target
+if [ -s "$data" ]; then
+    mkdir -p "$selection"
+    validate_target
+    mv -f "$data" "$selection/"
 else
     rm -f "$resolved"
 fi
+rm -f "$legacy"

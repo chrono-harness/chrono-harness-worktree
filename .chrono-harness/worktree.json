@@ -29,7 +29,8 @@
     "roles": {
       "feature": "integration",
       "integration": "integration"
-    }
+    },
+    "optional_input_file": ".chrono-harness/state/tool-selection/versions.toml"
   },
   "automatic_cleanup": ".chrono-harness/cleanup.json"
 }
