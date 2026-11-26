@@ -21,7 +21,7 @@ jobs:
       unit_worktree: ${{ steps.detect.outputs.unit_worktree }}
     steps:
       - name: Acquire declared detector source
-        uses: actions/checkout@v4.4.0
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
@@ -53,7 +53,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Check out exact candidate
-        uses: actions/checkout@v4.4.0
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
@@ -78,7 +78,7 @@ jobs:
           '.chrono-harness/bin/chrono-ci' production --host-root . --config '.chrono-harness/ci/units.json' --unit 'worktree' --github-output "$GITHUB_OUTPUT"
       - name: Preserve actual check evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: chrono-unit-worktree-${{ github.run_id }}-${{ github.run_attempt }}
           path: ".chrono-harness/state/worktree/"
@@ -92,7 +92,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Check out exact candidate
-        uses: actions/checkout@v4.4.0
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
@@ -114,7 +114,7 @@ jobs:
           '.chrono-harness/bin/chrono-harness' 'check' '--collect'
       - name: Preserve actual check evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: chrono-collection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ".chrono-harness/state/collection/"
