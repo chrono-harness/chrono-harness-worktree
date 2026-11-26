@@ -144,6 +144,18 @@
       ]
     },
     {
+      "path": ".config/mise/conf.d/selected-chrono-harness.toml",
+      "owner": "host",
+      "surface": "product",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ]
+    },
+    {
       "path": ".github/ISSUE_TEMPLATE/bug.yml",
       "owner": "host",
       "surface": "documentation",
