@@ -14,6 +14,10 @@ pub use crate::document::add_stream_bytes;
 pub use document::add_stream_bytes;
 
 #[cfg(verus_keep_ghost)]
+#[path = "automatic/operation_scopes.rs"]
+pub mod operation_scopes;
+
+#[cfg(verus_keep_ghost)]
 #[path = "automatic/standalone_expiry.rs"]
 mod standalone_expiry;
 #[cfg(verus_keep_ghost)]

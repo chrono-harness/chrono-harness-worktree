@@ -435,6 +435,26 @@ pub(crate) fn expect(actual: bool)
     if !actual { panic!(); }
 }
 
+#[cfg(verus_keep_ghost)]
+fn live_paths_require_a_write_with_a_matching_resource() {
+    let empty: [u8; 0] = [];
+    let left = [7u8];
+    let unrelated = [5u8, 6];
+    let multiple = [4u8, 7, 7];
+    let matches = |a: &u8, b: &u8| -> (same: bool)
+        ensures same == (*a == *b)
+    { *a == *b };
+    assert(!matches.ensures((&left@[0], &multiple@[1]), false));
+    assert(!matches.ensures((&multiple@[1], &left@[0]), false));
+    expect(!policy::operation_scopes::conflicting_resources(&left, &empty, &multiple, &empty, matches));
+    expect(!policy::operation_scopes::conflicting_resources(&empty, &left, &empty, &unrelated, matches));
+    expect(policy::operation_scopes::conflicting_resources(&empty, &left, &multiple, &empty, matches));
+    expect(policy::operation_scopes::conflicting_resources(&multiple, &empty, &empty, &left, matches));
+    expect(policy::operation_scopes::conflicting_resources(&empty, &multiple, &empty, &left, matches));
+    expect(!policy::operation_scopes::conflicting_resources(&empty, &empty, &empty, &empty, matches));
+}
+
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn current_main_cache_custody_requires_a_released_matching_declaration() {
     broadcast use vstd::string::group_string_axioms;
