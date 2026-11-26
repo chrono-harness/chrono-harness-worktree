@@ -51,9 +51,10 @@ jobs:
           set -euo pipefail
           cargo build --release --locked --manifest-path crates/worktree/Cargo.toml
           binary="$CARGO_TARGET_DIR/release/chrono-worktree"
-          version=${GITHUB_REF_NAME#v}
-          test "$("$binary" --version)" = "chrono-worktree ${version%%-*}"
-          "$binary" --help | grep -F 'chrono-worktree start'
+          version=$("$binary" --version)
+          "$binary" --help > "$RUNNER_TEMP/release-help"
+          cargo run --quiet --locked --release --manifest-path crates/worktree-tests/Cargo.toml \
+            --example release_observation -- "$GITHUB_REF_NAME" "$version" "$RUNNER_TEMP/release-help"
           mkdir "$RUNNER_TEMP/dist"
           cp "$CARGO_TARGET_DIR/release/chrono-worktree" "$RUNNER_TEMP/dist/chrono-worktree-$PLATFORM"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
