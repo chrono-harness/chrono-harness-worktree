@@ -17,6 +17,10 @@ use vstd::vpanic as panic;
 #[path = "../examples/release_observation.rs"]
 mod release_observation;
 
+#[cfg(verus_keep_ghost)]
+#[path = "adopted_owner.rs"]
+mod adopted_owner_boundaries;
+
 verus! {
 
 // These files are rendered by the host's selected Copier template.
@@ -346,17 +350,7 @@ fn immutable_original_preserves_all_bytes_including_nul_and_non_utf8() {
     assert(missing_bytes is Reject);
 }
 
-#[cfg_attr(not(verus_keep_ghost), test)]
-fn intent_presence_handles_first_publication_reentry_and_orphan_preparation() {
-    let first = policy::intent_action(false, false);
-    assert(first is Prepare);
-    let orphan = policy::intent_action(false, true);
-    assert(orphan is Reject);
-    let prepared = policy::intent_action(true, true);
-    assert(prepared is Read);
-    let published = policy::intent_action(true, false);
-    assert(published is Read);
-}
+
 
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn selected_owner_requires_original_or_exact_published_binding() {

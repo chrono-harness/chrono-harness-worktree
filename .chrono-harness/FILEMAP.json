@@ -430,7 +430,16 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/worktree-tests/tests/fixtures/process.rs",
@@ -454,7 +463,16 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/worktree-tests/tests/log_retention.rs",
@@ -490,7 +508,16 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/worktree-tests/tests/proof_support/ci/behavior.rs",
@@ -1276,7 +1303,20 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/worktree/src/evidence_retirement.rs",

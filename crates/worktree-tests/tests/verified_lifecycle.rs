@@ -71,6 +71,14 @@ mod fixture_body_boundaries;
 #[rustfmt::skip]
 mod inventory_failure_owner;
 
+#[cfg(verus_keep_ghost)]
+#[path = "git_checkout.rs"]
+mod git_checkout_boundaries;
+
+#[cfg(verus_keep_ghost)]
+#[path = "process.rs"]
+mod process_boundaries;
+
 verus! {
 #[cfg(verus_keep_ghost)]
 fn observation_uses_the_owners_exit_and_both_original_times() {
