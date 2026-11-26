@@ -13,7 +13,21 @@ use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
 use vstd::vpanic as panic;
 
+#[path = "../examples/release_observation.rs"]
+mod release_observation;
+
 verus! {
+
+#[cfg_attr(not(verus_keep_ghost), test)]
+fn release_accepts_the_expected_observations_only() {
+    let accepted = release_observation::accepts(true, true);
+    assert(accepted);
+    let refused_1 = release_observation::accepts(false, true);
+    assert(!refused_1);
+    let refused_2 = release_observation::accepts(true, false);
+    assert(!refused_2);
+}
+
 
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn policy_namespace_binds_protocol_and_physical_address() {

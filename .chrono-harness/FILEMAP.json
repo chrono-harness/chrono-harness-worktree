@@ -250,7 +250,16 @@
       "owner": "host",
       "surface": "product",
       "cost": "unmeasured",
-      "edges": []
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "data",
+        "roots": []
+      }
     },
     {
       "path": ".gitignore",
@@ -712,6 +721,27 @@
           {
             "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
             "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
+    },
+    {
+      "path": "crates/worktree-tests/examples/release_observation.rs",
+      "owner": "worktree-tests",
+      "surface": "test",
+      "cost": "unmeasured",
+      "edges": [
+        {
+          "kind": "test-execution",
+          "to": "test:worktree-tests"
+        }
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
           }
         ]
       }
