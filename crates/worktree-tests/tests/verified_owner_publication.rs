@@ -6,6 +6,7 @@ mod policy;
 #[cfg(not(verus_keep_ghost))]
 use chrono_worktree::verified_owner_publication as policy;
 use policy::{Binding, Intent, Stage, Staged};
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
@@ -17,6 +18,26 @@ use vstd::vpanic as panic;
 mod release_observation;
 
 verus! {
+
+// These files are rendered by the host's selected Copier template.
+fn deployed_inputs() -> (&'static str, &'static str, &'static str, &'static str) {
+    (include_str!("../../../.github/roadmap.cjs"),
+     include_str!("../../../.github/workflows/issue-roadmap.yml"),
+     include_str!("../../../.config/mise/conf.d/selected-chrono-harness.toml"),
+     include_str!("../../../.chrono-harness/install-tools.sh"))
+}
+
+fn matches_host_template(roadmap: &str, workflow: &str, selection: &str, installer: &str) -> (matches: bool)
+    ensures matches == (roadmap@ == "5824ea576bd25a792c76e976dc2dcec1c7eb684f6a3a9de9919220a546b61cf9"@
+        && workflow@ == "26e679ce1f660f780408c9f5f266476abad2987954d07aae616abb2d3cde7438"@
+        && selection@ == "577707757340d6472c8b6be6c61b3af34b7558bc046deb7081285a207a4b03cd"@
+        && installer@ == "bb02bed142aaf7e95775ff14109a733adfe2939b9a14d24fa7fcfb502b6b5d90"@),
+{
+    <&str>::exec_eq(roadmap, "5824ea576bd25a792c76e976dc2dcec1c7eb684f6a3a9de9919220a546b61cf9")
+        && <&str>::exec_eq(workflow, "26e679ce1f660f780408c9f5f266476abad2987954d07aae616abb2d3cde7438")
+        && <&str>::exec_eq(selection, "577707757340d6472c8b6be6c61b3af34b7558bc046deb7081285a207a4b03cd")
+        && <&str>::exec_eq(installer, "bb02bed142aaf7e95775ff14109a733adfe2939b9a14d24fa7fcfb502b6b5d90")
+}
 
 fn expect_protected(value: bool)
     requires value,
@@ -480,4 +501,18 @@ fn final_publication_requires_exact_installed_payload_and_retained_original() {
     assert(!retained);
 }
 
+}
+
+#[cfg(not(verus_keep_ghost))]
+#[test]
+fn deployed_roadmap_and_tool_selection_match_the_host_template() {
+    use sha2::{Digest, Sha256};
+    let (roadmap, workflow, selection, installer) = deployed_inputs();
+    let digest = |source: &str| format!("{:x}", Sha256::digest(source.as_bytes()));
+    assert!(matches_host_template(
+        &digest(roadmap),
+        &digest(workflow),
+        &digest(selection),
+        &digest(installer)
+    ));
 }
