@@ -35,4 +35,4 @@ host_release_artifact: {"version": "0.1.1", "linux_sha256": "8fd9f01086ad928167f
 dependabot_auto_merge: true
 dependabot_updates:
 - {"package-ecosystem": "github-actions", "directory": "/", "schedule": {"interval": "daily"}, "groups": {"github-actions": {"patterns": ["*"]}}}
-- {"package-ecosystem": "cargo", "schedule": {"interval": "daily"}, "groups": {"cargo": {"patterns": ["*"]}}, "directories": ["/crates/worktree", "/crates/worktree-tests"]}
+- {"package-ecosystem": "cargo", "schedule": {"interval": "daily"}, "groups": {"cargo": {"patterns": ["*"], "exclude-patterns": ["vstd", "verus_*"]}, "verus": {"patterns": ["vstd", "verus_*"]}}, "directories": ["/crates/worktree", "/crates/worktree-tests"]}
