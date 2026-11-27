@@ -1,17 +1,34 @@
 //! Read only the fixed host documents consumed by the worktree. An executable
 //! identity selector uses its registered program as data, never as a command.
+use vstd::prelude::*;
+
+verus! {
+/// A selected platform policy must be a direct supported host document.
+pub(crate) fn direct_target(selector_field: bool, schema_version: Option<u64>) -> (valid: bool)
+    ensures valid == (!selector_field && (schema_version == Some(3u64) || schema_version == Some(4u64))),
+{
+    !selector_field && matches!(schema_version, Some(3) | Some(4))
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::document::{file_identity, json, relative_path, valid_digest};
+#[cfg(not(verus_keep_ghost))]
 use serde::Deserialize;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::Value;
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Resolved {
     pub(crate) selected: String,
     pub(crate) values: BTreeMap<String, Value>,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Resolved {
     pub(crate) fn into_selected(mut self) -> Result<Value, String> {
         self.values
@@ -20,18 +37,21 @@ impl Resolved {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Selector {
     schema: String,
     platforms: BTreeMap<String, Value>,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Identity {
     program: String,
     configurations: Vec<Target>,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Target {
@@ -41,6 +61,7 @@ struct Target {
     registry_path: Option<String>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn host_path(path: &str, entry: Option<&str>) -> Result<(), String> {
     relative_path(path)?;
     if !path.starts_with(".chrono-harness/") || Some(path) == entry {
@@ -48,6 +69,7 @@ fn host_path(path: &str, entry: Option<&str>) -> Result<(), String> {
     }
     Ok(())
 }
+#[cfg(not(verus_keep_ghost))]
 fn select(
     entry: &str,
     policy: &Value,
@@ -127,6 +149,7 @@ fn select(
         .map(Some)
         .ok_or_else(|| format!("no Git policy registered for {platform}"))
 }
+#[cfg(not(verus_keep_ghost))]
 fn reference<'a>(rows: &'a Value, key: &Value) -> Result<&'a Value, String> {
     let key = key
         .as_str()
@@ -143,6 +166,7 @@ fn reference<'a>(rows: &'a Value, key: &Value) -> Result<&'a Value, String> {
     }
     Ok(row)
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn read(
     entry: &str,
     mut read: impl FnMut(&str) -> Result<Vec<u8>, String>,
@@ -153,9 +177,10 @@ pub(crate) fn read(
     let mut values = BTreeMap::from([(entry.to_owned(), original)]);
     let selected = if let Some((path, identity)) = target {
         let policy = json(&read(&path)?)?;
-        if policy.get("schema").is_some()
-            || !matches!(policy["schema_version"].as_u64(), Some(3 | 4))
-        {
+        if !direct_target(
+            policy.get("schema").is_some(),
+            policy["schema_version"].as_u64(),
+        ) {
             return Err("selector requires a direct schema 3 or 4 policy".into());
         }
         if let Some((program, digest)) = identity {
