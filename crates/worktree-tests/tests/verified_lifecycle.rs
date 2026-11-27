@@ -101,6 +101,23 @@ fn observation_uses_the_owners_exit_and_both_original_times() {
 
 
 #[cfg(verus_keep_ghost)]
+fn log_report_uses_the_actual_error_list(exit: i32, report: Option<policy::log_retention::LogRetention>) {
+    let ghost original = report;
+    let accepted = policy::log_retention::accept_owner_report(exit, report);
+    proof { match original {
+        None => {
+            assert(accepted.is_ok() == (exit == 0));
+            if exit == 0 { assert(accepted == Ok::<Option<policy::log_retention::LogRetention>, ()>(None)); }
+        },
+        Some(logs) => {
+            if logs.errors.len() > 0 { assert(accepted.is_ok() == (exit == 1)); }
+            else { assert(accepted.is_ok() == (exit == 0)); }
+            if accepted.is_ok() { assert(accepted == Ok::<_, ()>(Some(logs))); }
+        },
+    } }
+}
+
+#[cfg(verus_keep_ghost)]
 fn log_contract<T>(exit: i32, stderr_empty: bool, report: Option<T>, has_errors: bool) {
     let ghost original_report = report;
     let allowed = policy::log_owner_can_report(exit, stderr_empty);
