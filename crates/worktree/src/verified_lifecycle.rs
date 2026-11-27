@@ -22,6 +22,9 @@ pub use observation_age::{ObservationAgeReply, observation_age_reply};
 #[path = "facts.rs"]
 pub(crate) mod facts;
 #[cfg(verus_keep_ghost)]
+#[path = "fetch_recovery.rs"]
+pub(crate) mod fetch_recovery;
+#[cfg(verus_keep_ghost)]
 #[path = "registration.rs"]
 pub(crate) mod registration;
 
@@ -114,7 +117,7 @@ pub use check_inputs::{
 
 #[cfg(verus_keep_ghost)]
 #[path = "start.rs"]
-mod start_verification;
+pub(crate) mod start_verification;
 #[cfg(not(verus_keep_ghost))]
 pub use crate::start::select_report_input_scope;
 #[cfg(verus_keep_ghost)]

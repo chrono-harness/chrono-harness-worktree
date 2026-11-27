@@ -6,6 +6,18 @@ use vstd::prelude::*;
 
 verus! {
 
+/// A failed peel or Git deletion leaves the temporary reference unresolved in the report.
+pub(crate) fn release_fetched_ref<D>(base: &str, peeled: &str, remove: D)
+    -> (result: Result<(), String>)
+    where D: FnOnce() -> Result<(), String>,
+    requires remove.requires(()),
+    ensures if base@ == peeled@ { remove.ensures((), result) }
+        else { result.is_err() && result->Err_0@ == "fetched target is not a commit"@ },
+{
+    if <&str>::exec_eq(base, peeled) { remove() }
+    else { Err("fetched target is not a commit".to_string()) }
+}
+
 pub open spec fn report_input_scope_result<S, T, R, E, O, P, C>(
     initial: S, operation: Seq<char>, publication: Option<T>,
     outputs: O, inputs: P, caller: C, out: (S, Result<Option<R>, E>),
@@ -569,16 +581,16 @@ pub(crate) fn execute(
     )?;
     let base = r.oid(source, &fetch_ref)?;
     let tree = r.oid(source, &format!("{base}^{{tree}}"))?;
-    if r.oid(source, &format!("{base}^{{commit}}"))? != base {
-        return Err("fetched target is not a commit".into());
-    }
-    report["base"] = value!(base);
-    report["base_tree"] = value!(tree);
-    // The fetched object is fixed before removing this invocation's temporary ref.
-    r.git(
-        source,
-        &["update-ref", "--no-deref", "-d", &fetch_ref, &base],
-    )?;
+    let peeled = r.oid(source, &format!("{base}^{{commit}}"))?;
+    release_fetched_ref(&base, &peeled, || {
+        report["base"] = value!(base);
+        report["base_tree"] = value!(tree);
+        r.git(
+            source,
+            &["update-ref", "--no-deref", "-d", &fetch_ref, &base],
+        )?;
+        Ok(())
+    })?;
     report["fetch_ref_removed"] = value!(true);
     if r.blob(source, &base, &o.config_path)? != bytes {
         return Err(

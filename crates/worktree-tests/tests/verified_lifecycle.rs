@@ -82,6 +82,41 @@ mod process_boundaries;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn fetched_commit_and_deletion_result(base: &str, other: &str, original: String)
+    requires base@ != other@,
+{
+    use policy::start_verification::release_fetched_ref;
+    let success = || -> (out: Result<(), String>) ensures out.is_ok() { Ok(()) };
+    let failure = || -> (out: Result<(), String>) ensures out == Err::<(), String>(original) { Err(original) };
+    let mismatch = release_fetched_ref(base, other, success);
+    let accepted = release_fetched_ref(base, base, success);
+    let failed = release_fetched_ref(base, base, failure);
+    assert(mismatch.is_err() && mismatch->Err_0@ == "fetched target is not a commit"@);
+    assert(accepted.is_ok() && failed == Err::<(), String>(original));
+}
+
+#[cfg(verus_keep_ghost)]
+fn unresolved_fetch_reference(reference: &str, other: &str, head: &str, changed: &str)
+    requires reference@ != other@, head@ != changed@,
+{
+    use policy::fetch_recovery::unresolved_fetch_report;
+    let no_base = unresolved_fetch_report(reference, reference, Some(false), None, head);
+    assert(no_base);
+    let matched = unresolved_fetch_report(reference, reference, Some(false), Some(Some(head)), head);
+    assert(matched);
+    let different_ref = unresolved_fetch_report(reference, other, Some(false), None, head);
+    assert(!different_ref);
+    let removed = unresolved_fetch_report(reference, reference, Some(true), None, head);
+    assert(!removed);
+    let unknown = unresolved_fetch_report(reference, reference, None, None, head);
+    assert(!unknown);
+    let invalid_base = unresolved_fetch_report(reference, reference, Some(false), Some(None), head);
+    assert(!invalid_base);
+    let other_base = unresolved_fetch_report(reference, reference, Some(false), Some(Some(changed)), head);
+    assert(!other_base);
+}
+
+#[cfg(verus_keep_ghost)]
 fn cli_write_results(code: u8, primary: u32, secondary: u32) {
     use policy::cli::published_exit;
     let normal = published_exit::<u32>(code, Ok(()), Ok(()));

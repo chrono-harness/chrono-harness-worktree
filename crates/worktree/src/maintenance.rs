@@ -1072,14 +1072,17 @@ fn cleanup_fetch(
         &["start", "reconstruct"],
     )?;
     let fetch_ref = field(&original, "fetch_ref")?;
-    if fetch_ref
-        != format!(
-            "refs/chrono-harness/fetch/{}",
-            field(&original, "lock_reason")?
-        )
-        || original["fetch_ref_removed"] != false
-        || original.get("base").is_some_and(|base| base != head)
-    {
+    let expected = format!(
+        "refs/chrono-harness/fetch/{}",
+        field(&original, "lock_reason")?
+    );
+    if !crate::fetch_recovery::unresolved_fetch_report(
+        fetch_ref,
+        &expected,
+        original["fetch_ref_removed"].as_bool(),
+        original.get("base").map(Value::as_str),
+        head,
+    ) {
         return Err("original report does not identify this unresolved temporary fetch ref".into());
     }
     cleanup_fetch_ref(

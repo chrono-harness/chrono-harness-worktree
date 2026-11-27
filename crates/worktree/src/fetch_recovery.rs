@@ -1,11 +1,42 @@
 //! A pre-fetch identity does not assert that fetching completed or identify its result.
+use vstd::contrib::exec_spec::ExecSpecEq;
+use vstd::prelude::*;
+
+verus! {
+/// A present base must be a string naming this commit; a malformed field is a mismatch.
+pub(crate) fn unresolved_fetch_report(
+    reference: &str, expected: &str, removed: Option<bool>,
+    base: Option<Option<&str>>, head: &str,
+) -> (accepted: bool)
+    ensures accepted == (reference@ == expected@ && removed == Some(false)
+        && match base {
+            None => true,
+            Some(Some(value)) => value@ == head@,
+            Some(None) => false,
+        }),
+{
+    <&str>::exec_eq(reference, expected) && removed == Some(false) && match base {
+        None => true,
+        Some(Some(value)) => <&str>::exec_eq(value, head),
+        Some(None) => false,
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::document::decode;
+#[cfg(not(verus_keep_ghost))]
 use crate::facts;
+#[cfg(not(verus_keep_ghost))]
 use crate::recovery::{self, Evidence, ExpectedResult};
+#[cfg(not(verus_keep_ghost))]
 use serde::Deserialize;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::Value;
+#[cfg(not(verus_keep_ghost))]
 use std::path::Path;
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Intent {
@@ -23,6 +54,7 @@ struct Intent {
     report_path: String,
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn publish(root: &Path, report: &mut Value) -> Result<(), String> {
     recovery::publish_fields(
         root,
@@ -46,6 +78,7 @@ pub(crate) fn publish(root: &Path, report: &mut Value) -> Result<(), String> {
     )
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn inspect(
     root: &Path,
     config_path: &str,
