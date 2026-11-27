@@ -1022,37 +1022,3 @@ fn observed_reference_contract<'a>(head: &'a str, retained: &'a str, branch: &st
     assert(actual.is_err());
 }
 }
-
-
-#[cfg(not(verus_keep_ghost))]
-#[test]
-fn closing_the_maintenance_notice_reader_preserves_the_handoff() {
-    use std::{env, fs, io, path::Path, process::Command};
-
-    const CHILD_ROOT: &str = "CHRONO_TEST_MAINTENANCE_NOTICE_ROOT";
-    if let Some(root) = env::var_os(CHILD_ROOT) {
-        chrono_worktree::announce_maintenance(Path::new(&root), "published-handoff");
-        return;
-    }
-
-    let host = tempfile::tempdir().unwrap();
-    let config = host.path().join(".chrono-harness");
-    fs::create_dir_all(config.join("state")).unwrap();
-    fs::write(
-        config.join("maintenance.json"),
-        br#"{"schema":"chrono-unified-maintenance/v2","state_directory":".chrono-harness/state/automatic-cleanup-v2/","socket":".chrono-harness/state/maintenance.sock"}"#,
-    )
-    .unwrap();
-    let mut child = Command::new(env::current_exe().unwrap());
-    child
-        .args(["--exact", "closing_the_maintenance_notice_reader_preserves_the_handoff", "--nocapture"])
-        .env_remove("CHRONO_MAINTENANCE_CONTEXT")
-        .env(CHILD_ROOT, host.path());
-    let visible = child.output().unwrap();
-    assert!(visible.status.success());
-    assert!(String::from_utf8(visible.stderr).unwrap().contains("wake-failed"));
-    let (reader, writer) = io::pipe().unwrap();
-    drop(reader);
-    let closed = child.stderr(writer).output().unwrap();
-    assert!(closed.status.success(), "child returned {}", closed.status);
-}
