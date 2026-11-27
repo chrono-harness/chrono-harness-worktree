@@ -1,14 +1,28 @@
+use vstd::{contrib::exec_spec::ExecSpecEq, prelude::*};
+
+#[cfg(not(verus_keep_ghost))]
 use crate::document::sha256;
+#[cfg(not(verus_keep_ghost))]
 use crate::document::{decode, no_symlink_parents, relative_path};
+#[cfg(not(verus_keep_ghost))]
 use crate::facts;
+#[cfg(not(verus_keep_ghost))]
 use crate::{
     Start,
     start::{self, Runner, paths},
 };
+#[cfg(not(verus_keep_ghost))]
 use serde::Deserialize;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json as value};
-use std::{collections::BTreeSet, fs, path::Path};
+#[cfg(not(verus_keep_ghost))]
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::Path,
+};
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Plan {
@@ -17,6 +31,7 @@ struct Plan {
     candidate: String,
     changes: Vec<Change>,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Change {
@@ -24,17 +39,62 @@ struct Change {
     action: Action,
     reason: Option<String>,
 }
-#[derive(Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-enum Action {
-    Carry,
-    Retire,
+verus! {
+#[cfg_attr(not(verus_keep_ghost), derive(Clone, Copy, serde::Deserialize))]
+#[cfg_attr(not(verus_keep_ghost), serde(rename_all = "lowercase"))]
+pub(crate) enum Action { Carry, Retire }
+
+pub(crate) fn valid_choice(fresh: bool, action: &Action, trimmed_reason: Option<&str>)
+    -> (valid: bool)
+    ensures valid == (fresh && (action is Carry || (trimmed_reason is Some
+        && trimmed_reason->Some_0@.len() > 0))),
+{
+    fresh && match action {
+        Action::Carry => true,
+        Action::Retire => match trimmed_reason {
+            Some(reason) => !reason.is_empty(),
+            None => false,
+        },
+    }
 }
+
+pub(crate) enum Selection { Done, Mismatch, Carry(String), Retire }
+
+/// Both iterators yield unique paths in the same string order.
+pub(crate) fn select_path(changed: Option<String>, declared: Option<(String, Action)>)
+    -> (selection: Selection)
+    ensures
+        (selection is Done) == (changed is None && declared is None),
+        (selection is Mismatch) == (changed.is_some() != declared.is_some()
+            || (changed is Some && declared is Some && changed->Some_0@ != declared->Some_0.0@)),
+        (selection is Retire) == (changed is Some && declared is Some
+            && changed->Some_0@ == declared->Some_0.0@ && declared->Some_0.1 is Retire),
+        (selection is Carry) == (changed is Some && declared is Some
+            && changed->Some_0@ == declared->Some_0.0@ && declared->Some_0.1 is Carry),
+        selection is Carry ==> selection->Carry_0@ == changed->Some_0@,
+{
+    match (changed, declared) {
+        (None, None) => Selection::Done,
+        (Some(path), Some((choice, action))) if <&str>::exec_eq(path.as_str(), choice.as_str()) => {
+            match action {
+                Action::Carry => Selection::Carry(path),
+                Action::Retire => Selection::Retire,
+            }
+        },
+        _ => Selection::Mismatch,
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Input {
     path: String,
     bytes: Vec<u8>,
-    plan: Plan,
+    base: String,
+    candidate: String,
+    choices: BTreeMap<String, Action>,
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn read(root: &Path, path: &str) -> Result<Input, String> {
     relative_path(path)?;
     if !path.starts_with(".chrono-harness/state/") {
@@ -47,22 +107,27 @@ pub(crate) fn read(root: &Path, path: &str) -> Result<Input, String> {
     }
     facts::full_oid(&plan.base)?;
     facts::full_oid(&plan.candidate)?;
-    let mut paths = BTreeSet::new();
-    for change in &plan.changes {
+    let mut choices = BTreeMap::new();
+    for change in plan.changes {
         relative_path(&change.path)?;
-        if !paths.insert(&change.path)
-            || change.action == Action::Retire
-                && change.reason.as_ref().is_none_or(|r| r.trim().is_empty())
-        {
+        let fresh = choices.insert(change.path, change.action).is_none();
+        if !valid_choice(
+            fresh,
+            &change.action,
+            change.reason.as_deref().map(str::trim),
+        ) {
             return Err("duplicate reconstruction path or retirement without a reason".into());
         }
     }
     Ok(Input {
         path: path.into(),
         bytes,
-        plan,
+        base: plan.base,
+        candidate: plan.candidate,
+        choices,
     })
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn execute(
     r: &mut Runner,
     o: &Start,
@@ -71,19 +136,18 @@ pub(crate) fn execute(
     report: &mut Value,
     input: Input,
 ) -> Result<(), String> {
-    let p = &input.plan;
-    report["reconstruction"] = value!({"path":input.path,"sha256":sha256(&input.bytes),"input_bytes":input.bytes,"source_base":p.base,"source_candidate":p.candidate});
-    if r.oid(&o.root, "HEAD")? != p.candidate {
+    report["reconstruction"] = value!({"path":input.path,"sha256":sha256(&input.bytes),"input_bytes":input.bytes,"source_base":input.base,"source_candidate":input.candidate});
+    if r.oid(&o.root, "HEAD")? != input.candidate {
         return Err("reconstruction candidate differs from source HEAD".into());
     }
-    for revision in [&p.base, &p.candidate] {
+    for revision in [&input.base, &input.candidate] {
         if r.oid(&o.root, &format!("{revision}^{{commit}}"))? != *revision {
             return Err("reconstruction endpoint is not a commit".into());
         }
     }
     let ancestry = r.command(
         &o.root,
-        &["merge-base", "--is-ancestor", &p.base, &p.candidate],
+        &["merge-base", "--is-ancestor", &input.base, &input.candidate],
     )?;
     if ancestry.exit_code != 0 {
         return Err(format!(
@@ -92,7 +156,7 @@ pub(crate) fn execute(
         ));
     }
     let config_path = r.config.host_config.clone();
-    let (registrations, _) = start::registrations(r, &o.root, &p.candidate, &config_path)?;
+    let (registrations, _) = start::registrations(r, &o.root, &input.candidate, &config_path)?;
     if !registrations
         .client
         .nonartifact_paths(registrations.config(), std::slice::from_ref(&input.path))?
@@ -110,21 +174,28 @@ pub(crate) fn execute(
             "--no-ext-diff",
             "--no-textconv",
             "-z",
-            &p.base,
-            &p.candidate,
+            &input.base,
+            &input.candidate,
             "--",
         ],
     )?)?;
-    let declared: BTreeSet<_> = p.changes.iter().map(|c| c.path.clone()).collect();
-    if changed != declared {
-        return Err("reconstruction choices must cover exactly the original DELTA paths".into());
+    let mut changed = changed.into_iter();
+    let mut declared = input.choices.into_iter();
+    let mut carried = BTreeSet::new();
+    loop {
+        match select_path(changed.next(), declared.next()) {
+            Selection::Done => break,
+            Selection::Mismatch => {
+                return Err(
+                    "reconstruction choices must cover exactly the original DELTA paths".into(),
+                );
+            }
+            Selection::Carry(path) => {
+                carried.insert(path);
+            }
+            Selection::Retire => {}
+        }
     }
-    let carried: BTreeSet<_> = p
-        .changes
-        .iter()
-        .filter(|c| c.action == Action::Carry)
-        .map(|c| c.path.clone())
-        .collect();
     let patch = if carried.is_empty() {
         vec![]
     } else {
@@ -138,8 +209,8 @@ pub(crate) fn execute(
             "--no-textconv",
             "--src-prefix=a/",
             "--dst-prefix=b/",
-            &p.base,
-            &p.candidate,
+            &input.base,
+            &input.candidate,
             "--",
         ];
         argv.extend(carried.iter().map(String::as_str));
@@ -147,7 +218,7 @@ pub(crate) fn execute(
     };
     report["reconstruction"]["patch_sha256"] = value!(sha256(&patch));
     report["reconstruction"]["carried_paths"] = value!(carried);
-    if r.oid(&o.root, "HEAD")? != p.candidate {
+    if r.oid(&o.root, "HEAD")? != input.candidate {
         return Err("source HEAD changed during reconstruction preparation".into());
     }
     // Keep the original creation lock until the staged result is verified.
@@ -200,7 +271,7 @@ pub(crate) fn execute(
     if !staged.is_subset(&carried) {
         return Err("reconstruction changed an undeclared path; preserve worktree and lock".into());
     }
-    if r.oid(&o.root, "HEAD")? != p.candidate {
+    if r.oid(&o.root, "HEAD")? != input.candidate {
         return Err("source HEAD changed during reconstruction; preserve both worktrees".into());
     }
     start::cleanliness(r, &o.root, registrations.config())?;

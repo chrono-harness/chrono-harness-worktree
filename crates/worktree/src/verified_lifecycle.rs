@@ -16,6 +16,9 @@ pub(crate) mod ownership;
 #[path = "process_fds.rs"]
 pub(crate) mod process_fds;
 #[cfg(verus_keep_ghost)]
+#[path = "reconstruct.rs"]
+pub(crate) mod reconstruct;
+#[cfg(verus_keep_ghost)]
 #[path = "removal.rs"]
 pub(crate) mod removal;
 #[cfg(verus_keep_ghost)]
