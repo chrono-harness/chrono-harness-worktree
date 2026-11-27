@@ -6,6 +6,11 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 #[cfg(verus_keep_ghost)]
+#[path = "facts.rs"]
+pub mod facts;
+#[cfg(not(verus_keep_ghost))]
+use crate::facts;
+#[cfg(verus_keep_ghost)]
 #[path = "artifact_disposal.rs"]
 mod artifact_disposal;
 #[cfg(not(verus_keep_ghost))]
@@ -98,13 +103,9 @@ pub fn valid_stage_names(names: &Vec<String>, nonempty: bool) -> (valid: bool)
     true
 }
 
-pub open spec fn stage_hex_digit(byte: u8) -> bool {
-    (0x30 <= byte <= 0x39) || (0x61 <= byte <= 0x66)
-}
-
 pub open spec fn stage_digest(bytes: Seq<u8>) -> bool {
     bytes.len() == 64 && forall|i: int| 0 <= i < bytes.len()
-        ==> stage_hex_digit(#[trigger] bytes[i])
+        ==> facts::lowercase_hex(#[trigger] bytes[i])
 }
 
 pub fn valid_stage_digest(bytes: &[u8]) -> (valid: bool)
@@ -115,11 +116,11 @@ pub fn valid_stage_digest(bytes: &[u8]) -> (valid: bool)
     while i < bytes.len()
         invariant
             bytes.len() == 64, 0 <= i <= bytes.len(),
-            forall|j: int| 0 <= j < i ==> stage_hex_digit(#[trigger] bytes[j]),
+            forall|j: int| 0 <= j < i ==> facts::lowercase_hex(#[trigger] bytes[j]),
         decreases bytes.len() - i,
     {
         let byte = bytes[i];
-        if !((48 <= byte && byte <= 57) || (97 <= byte && byte <= 102)) { return false; }
+        if !facts::is_lowercase_hex(byte) { return false; }
         i += 1;
     }
     true

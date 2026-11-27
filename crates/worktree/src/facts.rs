@@ -1,7 +1,74 @@
 //! Git object and checkout observations consumed by lifecycle operations.
+use vstd::{contrib::exec_spec::ExecSpecEq, prelude::*};
+
+verus! {
+pub open spec fn lowercase_hex(b: u8) -> bool {
+    (48 <= b <= 57) || (97 <= b <= 102)
+}
+
+/// The byte alphabet is common to Git object IDs and publication digests.
+pub(crate) fn is_lowercase_hex(b: u8) -> (valid: bool)
+    ensures valid == lowercase_hex(b),
+{ (48 <= b && b <= 57) || (97 <= b && b <= 102) }
+
+pub(crate) fn valid_git_oid(bytes: &[u8]) -> (valid: bool)
+    ensures valid == ((bytes.len() == 40 || bytes.len() == 64)
+        && (forall|i: int| 0 <= i < bytes.len() ==> lowercase_hex(#[trigger] bytes@[i]))
+        && (exists|i: int| 0 <= i < bytes.len() && #[trigger] bytes@[i] != 48)),
+{
+    if bytes.len() != 40 && bytes.len() != 64 { return false; }
+    let mut nonzero = false;
+    let mut i = 0;
+    while i < bytes.len()
+        invariant
+            i <= bytes.len(),
+            forall|j: int| 0 <= j < i ==> lowercase_hex(#[trigger] bytes@[j]),
+            nonzero == (exists|j: int| 0 <= j < i && #[trigger] bytes@[j] != 48),
+        decreases bytes.len() - i,
+    {
+        let b = bytes[i];
+        if !is_lowercase_hex(b) { return false; }
+        nonzero = nonzero || b != 48;
+        i += 1;
+    }
+    nonzero
+}
+
+pub(crate) enum ParentLine<'a> { End, Other, Parent(&'a [u8]) }
+
+pub(crate) open spec fn has_parent_prefix(line: Seq<u8>) -> bool {
+    line.len() >= 7 && line.subrange(0, 7) == seq![112u8, 97, 114, 101, 110, 116, 32]
+}
+
+pub(crate) fn parent_header(line: &[u8]) -> (result: ParentLine<'_>)
+    ensures
+        (result is End) == (line.len() == 0),
+        (result is Parent) == has_parent_prefix(line@),
+        result is Parent ==> result->Parent_0@ == line@.subrange(7, line.len() as int),
+        (result is Other) == (line.len() > 0 && !has_parent_prefix(line@)),
+{
+    if line.is_empty() { return ParentLine::End; }
+    let keyword = ['p' as u8, 'a' as u8, 'r' as u8, 'e' as u8, 'n' as u8, 't' as u8, ' ' as u8];
+    let prefix = keyword.as_slice();
+    if line.len() >= prefix.len() {
+        let (head, rest) = line.split_at(prefix.len());
+        proof {
+            assert(head.deep_view() =~= head@);
+            assert(prefix.deep_view() =~= prefix@);
+        }
+        if <&[u8]>::exec_eq(head, prefix) { return ParentLine::Parent(rest); }
+    }
+    ParentLine::Other
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::document::relative_path;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::Value;
+#[cfg(not(verus_keep_ghost))]
 use sha2::{Digest, Sha256};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -13,6 +80,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) const LITERAL_PATHSPEC_CONTROLS: [&str; 4] = [
     "GIT_LITERAL_PATHSPECS",
     "GIT_GLOB_PATHSPECS",
@@ -20,31 +88,32 @@ pub(crate) const LITERAL_PATHSPEC_CONTROLS: [&str; 4] = [
     "GIT_ICASE_PATHSPECS",
 ];
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn full_oid(oid: &str) -> Result<(), String> {
-    if matches!(oid.len(), 40 | 64)
-        && oid
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-        && oid.bytes().any(|b| b != b'0')
-    {
+    if valid_git_oid(oid.as_bytes()) {
         Ok(())
     } else {
         Err("expected full nonzero lowercase commit OID".into())
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn commit_parents(bytes: &[u8]) -> Result<Vec<String>, String> {
-    bytes
-        .split(|b| *b == b'\n')
-        .take_while(|line| !line.is_empty())
-        .filter_map(|line| line.strip_prefix(b"parent "))
-        .map(|raw| {
-            let oid = std::str::from_utf8(raw).map_err(|_| "invalid parent OID")?;
-            full_oid(oid)?;
-            Ok(oid.to_owned())
-        })
-        .collect()
+    let mut parents = Vec::new();
+    for line in bytes.split(|b| *b == b'\n') {
+        match parent_header(line) {
+            ParentLine::End => break,
+            ParentLine::Other => continue,
+            ParentLine::Parent(raw) => {
+                let oid = std::str::from_utf8(raw).map_err(|_| "invalid parent OID")?;
+                full_oid(oid)?;
+                parents.push(oid.to_owned());
+            }
+        }
+    }
+    Ok(parents)
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn artifact_directories(config: &Value) -> Result<Vec<&str>, String> {
     config["artifacts"]
         .as_array()
@@ -53,6 +122,7 @@ pub(crate) fn artifact_directories(config: &Value) -> Result<Vec<&str>, String> 
         .map(|item| item["path"].as_str().ok_or("missing artifact path".into()))
         .collect()
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn artifact_exclusions(artifacts: &[&str]) -> Vec<String> {
     artifacts
         .iter()
@@ -66,13 +136,16 @@ pub(crate) fn artifact_exclusions(artifacts: &[&str]) -> Vec<String> {
         })
         .collect()
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Entry {
     pub(crate) mode: String,
     pub(crate) kind: String,
     pub(crate) oid: String,
 }
+#[cfg(not(verus_keep_ghost))]
 pub type Tree = BTreeMap<String, Entry>;
+#[cfg(not(verus_keep_ghost))]
 fn records(raw: &[u8]) -> Result<impl Iterator<Item = &str>, String> {
     if raw.last().is_some_and(|c| *c != 0) {
         return Err("incomplete Git inventory".into());
@@ -80,6 +153,7 @@ fn records(raw: &[u8]) -> Result<impl Iterator<Item = &str>, String> {
     let text = std::str::from_utf8(raw).map_err(|_| "non-UTF8 Git inventory")?;
     Ok(text.split_terminator('\0'))
 }
+#[cfg(not(verus_keep_ghost))]
 fn fields<'a>(line: &'a str, what: &str) -> Result<([&'a str; 3], &'a str), String> {
     let (meta, path) = line
         .split_once('\t')
@@ -91,6 +165,7 @@ fn fields<'a>(line: &'a str, what: &str) -> Result<([&'a str; 3], &'a str), Stri
     relative_path(path)?;
     Ok((tokens, path))
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn parse_tree(raw: &[u8]) -> Result<Tree, String> {
     let mut tree = Tree::new();
     for line in records(raw)? {
@@ -112,6 +187,7 @@ pub fn parse_tree(raw: &[u8]) -> Result<Tree, String> {
     }
     Ok(tree)
 }
+#[cfg(not(verus_keep_ghost))]
 fn blob_matches<D: Digest>(oid: &str, len: u64, mut source: impl Read) -> Result<bool, String> {
     let mut hash = D::new();
     hash.update(format!("blob {len}\0").as_bytes());
@@ -140,6 +216,7 @@ fn blob_matches<D: Digest>(oid: &str, len: u64, mut source: impl Read) -> Result
         .collect();
     Ok(actual == oid)
 }
+#[cfg(not(verus_keep_ghost))]
 fn matches_blob(oid: &str, len: u64, source: impl Read) -> Result<bool, String> {
     match oid.len() {
         40 => blob_matches::<sha1::Sha1>(oid, len, source),
@@ -147,6 +224,7 @@ fn matches_blob(oid: &str, len: u64, source: impl Read) -> Result<bool, String> 
         _ => Err("invalid Git blob OID".into()),
     }
 }
+#[cfg(not(verus_keep_ghost))]
 fn physical(root: &Path, name: &str) -> Result<Option<PathBuf>, String> {
     let mut path = root.to_owned();
     let mut parts = Path::new(name).components().peekable();
@@ -163,6 +241,7 @@ fn physical(root: &Path, name: &str) -> Result<Option<PathBuf>, String> {
     }
     Ok(Some(path))
 }
+#[cfg(not(verus_keep_ghost))]
 fn matches(root: &Path, name: &str, entry: &Entry) -> Result<bool, String> {
     if entry.kind != "blob" || !matches!(entry.mode.as_str(), "100644" | "100755" | "120000") {
         return Ok(false);
@@ -202,6 +281,7 @@ fn matches(root: &Path, name: &str, entry: &Entry) -> Result<bool, String> {
     }
     matches_blob(&entry.oid, opened.len(), file)
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn checkout_changes(root: &Path, expected: &Tree, index: &[u8]) -> Result<Vec<String>, String> {
     let mut stages = BTreeSet::new();
     let mut changed = BTreeSet::new();
@@ -229,10 +309,12 @@ pub fn checkout_changes(root: &Path, expected: &Tree, index: &[u8]) -> Result<Ve
 
 /// The ls-tree, cat-file and index transports use the host's bound Git executable.
 /// Verify immutable bytes against the Git object named in the original metadata.
+#[cfg(not(verus_keep_ghost))]
 struct Blob {
     oid: String,
     length: usize,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Blob {
     fn metadata(line: &str, hash_width: usize) -> Result<Self, String> {
         let fields = line.split(' ').collect::<Vec<_>>();
@@ -262,6 +344,7 @@ impl Blob {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub fn acquire_immutable_input(
     oid: &str,
     path: &str,
@@ -298,6 +381,7 @@ pub fn acquire_immutable_input(
 
 /// Use independent show calls for very small sets. Otherwise partition complete
 /// cat-file frames under the same stdout bound as the caller's original Git observations.
+#[cfg(not(verus_keep_ghost))]
 pub fn acquire_registry_blobs(
     oid: &str,
     paths: &[String],
