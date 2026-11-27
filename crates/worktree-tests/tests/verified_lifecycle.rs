@@ -82,6 +82,30 @@ mod process_boundaries;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn ownership_observations(directory: bool, is_file: bool, is_dir: bool, bound: &str, path: &str) {
+    use policy::ownership::{lease_kind, lease_identity};
+    let kind = lease_kind(directory, is_file, is_dir);
+    assert(kind == if directory { is_dir && !is_file } else { is_file && !is_dir });
+    let unbound = lease_identity(None, path);
+    assert(unbound);
+    let same = lease_identity(Some(bound), path);
+    assert(same == (bound@ == path@));
+}
+
+#[cfg(verus_keep_ghost)]
+fn inherited_ownership_descriptors(fd: i32, mut seen: std::collections::BTreeSet<i32>) {
+    use policy::process_fds::{insert_descriptor, reserved_copy};
+    let ghost before = seen@;
+    let first = insert_descriptor(&mut seen, fd);
+    assert(first == (fd >= 3 && !before.contains(fd)));
+    assert(seen@ == if fd >= 3 { before.insert(fd) } else { before });
+    let repeated = insert_descriptor(&mut seen, fd);
+    assert(!repeated);
+    let reserved = reserved_copy(fd);
+    assert(reserved == (fd == 255));
+}
+
+#[cfg(verus_keep_ghost)]
 fn descriptor_replies(declared: usize, delivered: usize, bytes: usize, marker: u8, truncated: bool) {
     use policy::retention_session::{read_descriptor_batch, check_descriptor_marker, batch_finished};
     let read = read_descriptor_batch(declared);

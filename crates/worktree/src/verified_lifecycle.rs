@@ -3,6 +3,12 @@ use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
+#[path = "ownership.rs"]
+pub(crate) mod ownership;
+#[cfg(verus_keep_ghost)]
+#[path = "process_fds.rs"]
+pub(crate) mod process_fds;
+#[cfg(verus_keep_ghost)]
 #[path = "removal.rs"]
 pub(crate) mod removal;
 #[cfg(verus_keep_ghost)]
