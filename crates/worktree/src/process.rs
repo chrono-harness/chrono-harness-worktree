@@ -1,8 +1,29 @@
 //! Bound processes launched by this worktree. Owned work is joined through native
 //! descriptors before an operation is allowed to publish terminal evidence.
+use vstd::contrib::exec_spec::ExecSpecEq;
+use vstd::prelude::*;
+
+verus! {
+pub(crate) fn transport_limit(bytes: usize) -> (valid: bool)
+    ensures valid == (1 <= bytes <= 67108864),
+{
+    bytes > 0 && bytes <= 64 * 1024 * 1024
+}
+
+pub(crate) fn executable_matches(expected: Option<&str>, actual: &str) -> (accepted: bool)
+    ensures accepted == match expected { None => true, Some(digest) => digest@ == actual@ },
+{
+    match expected { None => true, Some(digest) => <&str>::exec_eq(digest, actual) }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::document::{digest, file_identity, sha256};
+#[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::BTreeMap,
     ffi::OsString,
@@ -18,6 +39,7 @@ use std::{
     process::{Command, Stdio},
 };
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CommandSpec {
@@ -29,6 +51,7 @@ pub struct CommandSpec {
     pub timeout_seconds: u64,
     pub output_limit_bytes: usize,
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn validate_command(s: &CommandSpec) -> Result<(), String> {
     if s.program.is_empty()
         || s.program.contains('\0')
@@ -37,12 +60,13 @@ pub(crate) fn validate_command(s: &CommandSpec) -> Result<(), String> {
             .iter()
             .any(|(key, value)| key.is_empty() || key.contains(['=', '\0']) || value.contains('\0'))
         || s.timeout_seconds == 0
-        || !(1..=64 * 1024 * 1024).contains(&s.output_limit_bytes)
+        || !transport_limit(s.output_limit_bytes)
     {
         return Err("invalid command or resource bounds".into());
     }
     Ok(())
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn resolve_program(
     root: &Path,
     name: &str,
@@ -68,6 +92,7 @@ pub(crate) fn resolve_program(
     }
     Err(format!("executable not found: {name}"))
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessResult {
     pub(crate) argv: Vec<String>,
@@ -101,11 +126,13 @@ pub struct ProcessResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) launch_original: Option<Value>,
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Evidence<'a> {
     pub(crate) root: &'a Path,
     pub(crate) directory: &'a Path,
     pub(crate) publication: Option<&'a crate::retention::Publication>,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Evidence<'_> {
     fn create(&self, name: &str, limit: u64) -> Result<fs::File, String> {
         let path = self.directory.join(name);
@@ -117,6 +144,7 @@ impl Evidence<'_> {
         fs::File::create_new(path).map_err(|e| e.to_string())
     }
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn observed(
     root: &Path,
     s: &CommandSpec,
@@ -126,13 +154,13 @@ pub(crate) fn observed(
     evidence: Option<&Evidence<'_>>,
 ) -> Result<ProcessResult, String> {
     validate_command(s)?;
-    if !(1..=64 * 1024 * 1024).contains(&stdout_limit) {
+    if !transport_limit(stdout_limit) {
         return Err("invalid output transport limit".into());
     }
     let root = fs::canonicalize(root).map_err(|e| e.to_string())?;
     let executable = resolve_program(&root, &s.program, s.env.get("PATH").map(String::as_str))?;
     let hash = file_identity(&executable)?.0;
-    if expected.is_some_and(|value| value != hash) {
+    if !executable_matches(expected, &hash) {
         return Err("prelaunch executable digest mismatch".into());
     }
     let mut command = Command::new(&executable);
@@ -264,6 +292,7 @@ pub(crate) fn observed(
         launch_original,
     })
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn run_process(
     root: &Path,
     s: &CommandSpec,
@@ -275,6 +304,7 @@ pub(crate) fn run_process(
     }
     Ok(process)
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn run_process_observed(
     root: &Path,
     s: &CommandSpec,
@@ -283,6 +313,7 @@ pub(crate) fn run_process_observed(
 ) -> Result<ProcessResult, String> {
     observed(root, s, input, Some(digest), s.output_limit_bytes, None)
 }
+#[cfg(not(verus_keep_ghost))]
 pub fn run_process_observed_data(
     root: &Path,
     s: &CommandSpec,
@@ -292,6 +323,7 @@ pub fn run_process_observed_data(
 ) -> Result<ProcessResult, String> {
     observed(root, s, input, Some(digest), limit, None)
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Serialize)]
 pub(crate) struct Tool {
     pub(crate) program: String,
@@ -300,6 +332,7 @@ pub(crate) struct Tool {
     pub(crate) sha256: String,
     pub(crate) version: ProcessResult,
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn tool(
     root: &Path,
     program: &str,
@@ -338,6 +371,7 @@ pub(crate) fn tool(
     })
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl ProcessResult {
     /// Both original streams have already been observed. Encode their checked
     /// bytes once using the public retained-process representation.
@@ -408,6 +442,7 @@ impl ProcessResult {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn bind_compiler_directory(args: &mut [String], directory: &str) {
     if args.len() != 12
         || args[..7]

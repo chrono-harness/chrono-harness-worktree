@@ -1,5 +1,25 @@
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+
+verus! {
+pub(crate) fn published_exit<E>(code: u8, stdout: Result<(), E>, stderr: Result<(), E>)
+    -> (result: Result<u8, E>)
+    ensures result == match stdout {
+        Err(error) => Err(error),
+        Ok(()) => match stderr { Err(error) => Err(error), Ok(()) => Ok(code) },
+    },
+{
+    stdout?;
+    stderr?;
+    Ok(code)
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use chrono_worktree::CliOutput;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     ffi::OsString,
     io::{self, BufRead, BufReader, Write},
@@ -9,21 +29,25 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+#[cfg(not(verus_keep_ghost))]
 fn line(writer: &mut impl Write, value: &Value) -> io::Result<()> {
     serde_json::to_writer(&mut *writer, value)?;
     writer.write_all(b"\n")?;
     writer.flush()
 }
+#[cfg(not(verus_keep_ghost))]
 struct Diagnostics {
     child: Child,
     writer: Option<ChildStdin>,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Drop for Diagnostics {
     fn drop(&mut self) {
         self.writer.take();
         let _ = self.child.wait();
     }
 }
+#[cfg(not(verus_keep_ghost))]
 impl Diagnostics {
     fn open(root: &Path, operation: &str) -> io::Result<Option<Self>> {
         match std::fs::symlink_metadata(root.join(".chrono-harness/logging.json")) {
@@ -87,6 +111,7 @@ impl Diagnostics {
         }
     }
 }
+#[cfg(not(verus_keep_ghost))]
 fn write_bytes(destination: impl AsFd, mut bytes: &[u8]) -> io::Result<()> {
     while !bytes.is_empty() {
         match rustix::io::write(&destination, bytes) {
@@ -98,6 +123,7 @@ fn write_bytes(destination: impl AsFd, mut bytes: &[u8]) -> io::Result<()> {
     }
     Ok(())
 }
+#[cfg(not(verus_keep_ghost))]
 fn execute(args: &[String]) -> io::Result<u8> {
     let CliOutput {
         exit_code,
@@ -109,9 +135,9 @@ fn execute(args: &[String]) -> io::Result<u8> {
     }
     let first = write_bytes(io::stdout().lock(), stdout.as_bytes());
     let second = write_bytes(io::stderr().lock(), stderr.as_bytes());
-    first.and(second)?;
-    Ok(exit_code)
+    published_exit(exit_code, first, second)
 }
+#[cfg(not(verus_keep_ghost))]
 fn run(args: Vec<OsString>) -> io::Result<u8> {
     let root = args
         .iter()
@@ -147,6 +173,7 @@ fn run(args: Vec<OsString>) -> io::Result<u8> {
     let code = sink.execute(&decoded)?;
     sink.finish(code)
 }
+#[cfg(not(verus_keep_ghost))]
 fn main() -> ExitCode {
     let code = run(std::env::args_os().collect()).unwrap_or_else(|error| {
         let _ = write_bytes(
