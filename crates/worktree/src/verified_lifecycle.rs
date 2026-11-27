@@ -175,6 +175,12 @@ mod cli_status_owner;
 #[cfg(verus_keep_ghost)]
 pub use cli_status_owner::successful_report_status;
 
+#[cfg(verus_keep_ghost)]
+#[path = "log_retention.rs"]
+pub mod log_retention;
+#[cfg(not(verus_keep_ghost))]
+pub use crate::log_retention;
+
 verus! {
 
 /// Classify one Git index row against the commit whose checkout is being cleaned.
