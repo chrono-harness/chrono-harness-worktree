@@ -1,7 +1,25 @@
 //! Kernels keep a file-description lease held until its last native descendant closes it.
+use std::collections::BTreeSet;
+use vstd::prelude::*;
+
+verus! {
+pub(crate) fn insert_descriptor(seen: &mut BTreeSet<i32>, fd: i32) -> (accepted: bool)
+    ensures
+        accepted == (fd >= 3 && !old(seen)@.contains(fd)),
+        seen@ == if fd >= 3 { old(seen)@.insert(fd) } else { old(seen)@ },
+{
+    fd >= 3 && seen.insert(fd)
+}
+
+/// The first duplicate starts at 202. Leave the shell's descriptor 255 available.
+pub(crate) fn reserved_copy(fd: i32) -> (reserved: bool)
+    ensures reserved == (fd == 255),
+{ fd == 255 }
+}
+
+#[cfg(not(verus_keep_ghost))]
 use std::{
     cell::RefCell,
-    collections::BTreeSet,
     io,
     marker::PhantomData,
     os::{
@@ -12,9 +30,13 @@ use std::{
     rc::Rc,
     sync::atomic::{AtomicU64, Ordering},
 };
+#[cfg(not(verus_keep_ghost))]
 const ENV: &str = "CHRONO_PROCESS_FDS";
+#[cfg(not(verus_keep_ghost))]
 thread_local! {static SCOPES:RefCell<Vec<(u64, Vec<OwnedFd>)>>=const{RefCell::new(Vec::new())};}
+#[cfg(not(verus_keep_ghost))]
 static NEXT: AtomicU64 = AtomicU64::new(1);
+#[cfg(not(verus_keep_ghost))]
 fn owned_copy(fd: RawFd) -> io::Result<OwnedFd> {
     if fd < 3 {
         return Err(io::Error::other("ownership descriptor aliases stdio"));
@@ -27,16 +49,18 @@ fn owned_copy(fd: RawFd) -> io::Result<OwnedFd> {
         Ok(unsafe { OwnedFd::from_raw_fd(result) })
     };
     let copy = duplicate(202)?;
-    if copy.as_raw_fd() == 255 {
+    if reserved_copy(copy.as_raw_fd()) {
         duplicate(256)
     } else {
         Ok(copy)
     }
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Scope {
     id: u64,
     _thread: PhantomData<Rc<()>>,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Scope {
     pub(crate) fn new(fds: &[BorrowedFd<'_>]) -> Result<Self, String> {
         let copies = fds
@@ -52,11 +76,13 @@ impl Scope {
         })
     }
 }
+#[cfg(not(verus_keep_ghost))]
 impl Drop for Scope {
     fn drop(&mut self) {
         SCOPES.with(|s| s.borrow_mut().retain(|(id, _)| *id != self.id))
     }
 }
+#[cfg(not(verus_keep_ghost))]
 fn inherited() -> Result<Vec<RawFd>, String> {
     let Some(value) = std::env::var_os(ENV) else {
         return Ok(vec![]);
@@ -66,13 +92,14 @@ fn inherited() -> Result<Vec<RawFd>, String> {
     text.split(',')
         .map(|item| {
             let fd: RawFd = item.parse().map_err(|_| "invalid ownership descriptor")?;
-            if fd < 3 || !seen.insert(fd) {
+            if !insert_descriptor(&mut seen, fd) {
                 return Err("invalid or duplicate ownership descriptor".into());
             }
             Ok(fd)
         })
         .collect()
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn forward_command(
     command: &mut Command,
     extra: &[BorrowedFd<'_>],

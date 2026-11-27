@@ -1,5 +1,25 @@
 //! Enrollment locks protect a worktree and its in-flight Git descendants.
+use vstd::contrib::exec_spec::ExecSpecEq;
+use vstd::prelude::*;
+
+verus! {
+/// A lease names exactly the physical object kind which its caller requested.
+pub(crate) fn lease_kind(directory: bool, is_file: bool, is_dir: bool) -> (accepted: bool)
+    ensures accepted == (is_dir == directory && is_file == !directory),
+{
+    is_dir == directory && is_file != directory
+}
+
+pub(crate) fn lease_identity(expected: Option<&str>, observed: &str) -> (accepted: bool)
+    ensures accepted == match expected { Some(value) => value@ == observed@, None => true },
+{
+    match expected { Some(value) => <&str>::exec_eq(value, observed), None => true }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::process_fds::Scope;
+#[cfg(not(verus_keep_ghost))]
 use std::{
     fs::{self, File, Metadata, OpenOptions, TryLockError},
     io,
@@ -11,19 +31,22 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(not(verus_keep_ghost))]
 fn inode(metadata: &Metadata) -> String {
     format!("{}:{}", metadata.dev(), metadata.ino())
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn identity(path: &Path) -> Result<String, String> {
     let metadata = fs::symlink_metadata(path)
         .map_err(|e| format!("ownership identity {}: {e}", path.display()))?;
-    if !metadata.is_file() {
+    if !lease_kind(false, metadata.is_file(), metadata.is_dir()) {
         return Err("ownership lease must be a physical regular file".into());
     }
     Ok(inode(&metadata))
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Lease {
     file: File,
     path: PathBuf,
@@ -33,6 +56,7 @@ pub(crate) struct Lease {
     _scope: Scope,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Lease {
     fn lock(
         file: File,
@@ -43,12 +67,15 @@ impl Lease {
         wait: Option<Duration>,
     ) -> Result<Option<Self>, String> {
         let metadata = file.metadata().map_err(|e| e.to_string())?;
-        if (directory && !metadata.is_dir()) || (!directory && !metadata.is_file()) {
+        if !lease_kind(directory, metadata.is_file(), metadata.is_dir()) {
             return Err("unexpected ownership lease type".into());
         }
         let id = inode(&metadata);
-        if expected.is_some_and(|expected| expected != id)
-            || inode(&fs::symlink_metadata(path).map_err(|e| e.to_string())?) != id
+        if !lease_identity(expected, &id)
+            || !lease_identity(
+                Some(&id),
+                &inode(&fs::symlink_metadata(path).map_err(|e| e.to_string())?),
+            )
         {
             return Err("ownership lease identity changed; preserve work".into());
         }
@@ -130,7 +157,7 @@ impl Lease {
     pub(crate) fn exclusive_blocking(path: &Path) -> Result<Self, String> {
         let file = Self::open_lease_file(path, None, true)?;
         let metadata = file.metadata().map_err(|e| e.to_string())?;
-        if !metadata.is_file() {
+        if !lease_kind(false, metadata.is_file(), metadata.is_dir()) {
             return Err("unexpected ownership lease type".into());
         }
         let id = inode(&metadata);
@@ -140,9 +167,8 @@ impl Lease {
 
     pub(crate) fn stable(&self) -> Result<(), String> {
         let metadata = fs::symlink_metadata(&self.path).map_err(|e| e.to_string())?;
-        if metadata.is_dir() != self.directory
-            || metadata.is_file() == self.directory
-            || inode(&metadata) != self.id
+        if !lease_kind(self.directory, metadata.is_file(), metadata.is_dir())
+            || !lease_identity(Some(&self.id), &inode(&metadata))
         {
             return Err("held ownership lease identity changed".into());
         }
@@ -159,8 +185,10 @@ impl Lease {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct DirectoryLease(Lease);
 
+#[cfg(not(verus_keep_ghost))]
 impl DirectoryLease {
     pub(crate) fn shared(path: &Path) -> Result<Self, String> {
         Self::blocking(path, false)
