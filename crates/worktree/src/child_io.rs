@@ -1,5 +1,34 @@
 //! Wait on original stdio, child exit and the inherited open-description sentinel.
 //! waitid(WNOWAIT) pins the child PID until group cancellation and final reap finish.
+use vstd::prelude::*;
+
+verus! {
+/// poll accepts whole signed milliseconds. Round up so a positive remainder always blocks.
+pub(crate) fn poll_millis(nanos: u128) -> (timeout: i32)
+    ensures
+        timeout == (if nanos == 0 { 0 }
+            else if nanos > 2147483647000000 { i32::MAX as int }
+            else { (nanos as int - 1) / 1000000 + 1 }),
+{
+    if nanos == 0 { 0 }
+    else if nanos > (i32::MAX as u128) * 1_000_000 { i32::MAX }
+    else { ((nanos - 1) / 1_000_000 + 1) as i32 }
+}
+
+pub(crate) enum PollReply { Ready, Again, Failed }
+
+pub(crate) fn poll_reply(count: i32, interrupted: bool) -> (reply: PollReply)
+    ensures (reply is Ready) == (count > 0),
+        (reply is Again) == (count == 0 || (count < 0 && interrupted)),
+        (reply is Failed) == (count < 0 && !interrupted),
+{
+    if count > 0 { PollReply::Ready }
+    else if count == 0 || interrupted { PollReply::Again }
+    else { PollReply::Failed }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use std::{
     io::{self, Read, Write},
     os::{
@@ -11,6 +40,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(not(verus_keep_ghost))]
 fn nonblocking(fd: RawFd) -> io::Result<()> {
     let options = unsafe { libc::fcntl(fd, libc::F_GETFL) };
     if options < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, options | libc::O_NONBLOCK) } < 0 {
@@ -18,6 +48,7 @@ fn nonblocking(fd: RawFd) -> io::Result<()> {
     }
     Ok(())
 }
+#[cfg(not(verus_keep_ghost))]
 fn observe_exit(pid: u32) -> io::Result<()> {
     loop {
         let mut info = std::mem::MaybeUninit::<libc::siginfo_t>::zeroed();
@@ -38,7 +69,9 @@ fn observe_exit(pid: u32) -> io::Result<()> {
         }
     }
 }
+#[cfg(not(verus_keep_ghost))]
 struct OwnedChild(Option<Child>);
+#[cfg(not(verus_keep_ghost))]
 impl OwnedChild {
     fn cancel(&self) {
         if let Some(child) = &self.0 {
@@ -51,6 +84,7 @@ impl OwnedChild {
         Ok(status)
     }
 }
+#[cfg(not(verus_keep_ghost))]
 impl Drop for OwnedChild {
     fn drop(&mut self) {
         self.cancel();
@@ -59,12 +93,14 @@ impl Drop for OwnedChild {
         }
     }
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Stream {
     pub(crate) bytes: Vec<u8>,
     pub(crate) complete: bool,
     limit: usize,
     exceeded: bool,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Stream {
     fn new(limit: usize) -> Self {
         Self {
@@ -107,6 +143,7 @@ impl Stream {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Captured {
     pub(crate) status: ExitStatus,
     pub(crate) stdout: Stream,
@@ -114,6 +151,7 @@ pub(crate) struct Captured {
     pub(crate) joined: bool,
     pub(crate) failure: Option<String>,
 }
+#[cfg(not(verus_keep_ghost))]
 fn descriptor(fd: Option<RawFd>, events: libc::c_short) -> libc::pollfd {
     libc::pollfd {
         fd: fd.unwrap_or(-1),
@@ -121,20 +159,28 @@ fn descriptor(fd: Option<RawFd>, events: libc::c_short) -> libc::pollfd {
         revents: 0,
     }
 }
+#[cfg(not(verus_keep_ghost))]
 fn wait(descriptors: &mut [libc::pollfd], deadline: Instant) -> io::Result<bool> {
-    let millis = deadline
-        .saturating_duration_since(Instant::now())
-        .as_millis();
-    let timeout = millis.min(i32::MAX as u128) as i32;
-    let result = unsafe { libc::poll(descriptors.as_mut_ptr(), descriptors.len() as _, timeout) };
-    if result < 0 {
-        let e = io::Error::last_os_error();
-        if e.kind() != io::ErrorKind::Interrupted {
-            return Err(e);
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        let timeout = poll_millis(remaining.as_nanos());
+        if timeout == 0 {
+            return Ok(false);
+        }
+        let result =
+            unsafe { libc::poll(descriptors.as_mut_ptr(), descriptors.len() as _, timeout) };
+        let error = (result < 0).then(io::Error::last_os_error);
+        let interrupted = error
+            .as_ref()
+            .is_some_and(|e| e.kind() == io::ErrorKind::Interrupted);
+        match poll_reply(result, interrupted) {
+            PollReply::Ready => return Ok(true),
+            PollReply::Again => continue,
+            PollReply::Failed => return Err(error.expect("negative poll result")),
         }
     }
-    Ok(result > 0)
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn capture(
     child: Child,
     lineage: UnixStream,
@@ -201,9 +247,7 @@ pub(crate) fn capture(
                 descriptor(lineage.as_ref().map(AsRawFd::as_raw_fd), libc::POLLIN),
                 descriptor(terminal.as_ref().map(AsRawFd::as_raw_fd), libc::POLLIN),
             ];
-            if Instant::now() >= deadline
-                || !wait(&mut fds, deadline)? && Instant::now() >= deadline
-            {
+            if !wait(&mut fds, deadline)? {
                 if cancelled {
                     break;
                 }
