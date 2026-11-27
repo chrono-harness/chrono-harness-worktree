@@ -319,3 +319,26 @@ fn maintenance_selects_a_round_only_for_received_events() {
     expect(policy::maintenance_has_events(64));
 }
 }
+
+#[cfg(verus_keep_ghost)]
+verus! {
+fn kernel_wait_boundaries(nanos: u128, interrupted: bool) {
+    use policy::child_io::{poll_millis, poll_reply, PollReply};
+    let delay = poll_millis(nanos);
+    assert((delay == 0) == (nanos == 0));
+    if nanos > 0 && nanos <= 2147483647000000u128 {
+        assert(delay as int == (nanos as int - 1) / 1000000 + 1);
+        assert((delay as int - 1) * 1000000 < nanos && nanos <= delay as int * 1000000);
+    }
+    if nanos > 2147483647000000u128 { assert(delay == i32::MAX); }
+    let one = poll_millis(1);
+    let exact = poll_millis(1000000);
+    let partial = poll_millis(1000001);
+    assert(one == 1 && exact == 1 && partial == 2);
+    let zero = poll_reply(0, interrupted);
+    let error = poll_reply(-1, false);
+    let signal = poll_reply(-1, true);
+    let event = poll_reply(1, interrupted);
+    assert(zero is Again && error is Failed && signal is Again && event is Ready);
+}
+}

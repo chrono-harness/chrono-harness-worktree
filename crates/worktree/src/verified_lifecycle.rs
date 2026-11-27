@@ -3,6 +3,9 @@ use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
+#[path = "child_io.rs"]
+pub(crate) mod child_io;
+#[cfg(verus_keep_ghost)]
 #[path = "ownership.rs"]
 pub(crate) mod ownership;
 #[cfg(verus_keep_ghost)]
