@@ -82,6 +82,36 @@ mod process_boundaries;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn reconstruction_declarations(reason: &str) {
+    use policy::reconstruct::{valid_choice, Action};
+    proof { reveal_strlit(""); }
+    let carry = valid_choice(true, &Action::Carry, None);
+    let duplicate = valid_choice(false, &Action::Carry, None);
+    let unexplained = valid_choice(true, &Action::Retire, None);
+    let empty = valid_choice(true, &Action::Retire, Some(""));
+    let explained = valid_choice(true, &Action::Retire, Some(reason));
+    let repeated = valid_choice(false, &Action::Retire, Some(reason));
+    assert(carry && !duplicate && !unexplained && !empty && !repeated);
+    assert(explained == (reason@.len() > 0));
+}
+
+#[cfg(verus_keep_ghost)]
+fn reconstruction_pairs(path: String, declared: String, extra: String, missing: String) {
+    use policy::reconstruct::{select_path, Action, Selection};
+    let end = select_path(None, None);
+    let extra_choice = select_path(None, Some((extra, Action::Retire)));
+    let missing_choice = select_path(Some(missing), None);
+    assert(end is Done && extra_choice is Mismatch && missing_choice is Mismatch);
+    let kept = select_path(Some(path.clone()), Some((declared.clone(), Action::Carry)));
+    let retired = select_path(Some(path.clone()), Some((declared.clone(), Action::Retire)));
+    proof { if path@ == declared@ {
+        assert(kept is Carry && kept->Carry_0@ == path@ && retired is Retire);
+    } else {
+        assert(kept is Mismatch && retired is Mismatch);
+    } }
+}
+
+#[cfg(verus_keep_ghost)]
 fn ownership_observations(directory: bool, is_file: bool, is_dir: bool, bound: &str, path: &str) {
     use policy::ownership::{lease_kind, lease_identity};
     let kind = lease_kind(directory, is_file, is_dir);
