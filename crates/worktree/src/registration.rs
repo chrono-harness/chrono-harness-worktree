@@ -1,20 +1,68 @@
 //! Worktree passes fixed host data to the installed registration command.
+use vstd::contrib::exec_spec::ExecSpecEq;
+use vstd::prelude::*;
+
+verus! {
+pub(crate) fn same_config(selected: &str, reply: &str) -> (same: bool)
+    ensures same == (selected@ == reply@),
+{
+    <&str>::exec_eq(selected, reply)
+}
+
+/// Match each remaining reply path to its first unused occurrence in the request.
+pub open spec fn remaining_paths(request: Seq<String>, reply: Seq<String>, from: int, next: int) -> bool
+    decreases request.len() - from,
+{
+    if next >= reply.len() { true }
+    else if from >= request.len() { false }
+    else {
+        remaining_paths(request, reply, from + 1,
+            if request[from]@ == reply[next]@ { next + 1 } else { next })
+    }
+}
+
+pub(crate) fn ordered_paths(request: &[String], reply: &[String]) -> (accepted: bool)
+    ensures accepted == remaining_paths(request@, reply@, 0, 0),
+{
+    let mut from = 0;
+    let mut next = 0;
+    while from < request.len() && next < reply.len()
+        invariant from <= request.len(), next <= reply.len(),
+            remaining_paths(request@, reply@, 0, 0) == remaining_paths(request@, reply@, from as int, next as int),
+        decreases request.len() - from,
+    {
+        if <&str>::exec_eq(request[from].as_str(), reply[next].as_str()) {
+            next += 1;
+        }
+        from += 1;
+    }
+    next == reply.len()
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::document::{decode, file_identity};
+#[cfg(not(verus_keep_ghost))]
 use crate::process::{CommandSpec, resolve_program, run_process_observed_data};
+#[cfg(not(verus_keep_ghost))]
 use serde::Deserialize;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone)]
 pub(crate) enum Client {
     Standalone,
     Registered(Registered),
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone)]
 pub(crate) struct Registered {
     root: PathBuf,
@@ -22,6 +70,7 @@ pub(crate) struct Registered {
     digest: String,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl crate::Config {
     /// Bind the registration query and its declared nested runner search path.
     pub fn registration_command(
@@ -54,6 +103,7 @@ impl crate::Config {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Client {
     pub(crate) fn bind(
         root: &Path,
@@ -156,16 +206,31 @@ impl Client {
                 .cloned()
                 .collect());
         };
-        let result:Paths=registered.query(&json!({"operation":"nonartifact-paths","config":{"artifacts":config["artifacts"]},"paths":paths}))?;
-        // A response to this batch can only retain actual input paths in order.
-        let mut inputs = paths.iter();
-        if !result.paths.iter().all(|p| inputs.any(|i| i == p)) {
-            return Err("registration returned paths outside the queried batch".into());
-        }
-        Ok(result.paths)
+        registered_nonartifact_paths(&config["artifacts"], paths, |request| {
+            let reply: Paths = registered.query(request)?;
+            Ok(reply.paths)
+        })
     }
 }
 
+/// Send the registered path batch and preserve only occurrences from that batch, in order.
+#[cfg(not(verus_keep_ghost))]
+pub fn registered_nonartifact_paths(
+    artifacts: &Value,
+    paths: &[String],
+    query: impl FnOnce(&Value) -> Result<Vec<String>, String>,
+) -> Result<Vec<String>, String> {
+    let reply = query(&json!({
+        "operation": "nonartifact-paths",
+        "config": {"artifacts": artifacts},
+        "paths": paths,
+    }))?;
+    if !ordered_paths(paths, &reply) {
+        return Err("registration returned paths outside the queried batch".into());
+    }
+    Ok(reply)
+}
+#[cfg(not(verus_keep_ghost))]
 impl Registered {
     pub(crate) fn query<T: serde::de::DeserializeOwned>(
         &self,
@@ -194,6 +259,7 @@ impl Registered {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Registrations {
     pub(crate) client: Arc<Client>,
     entry: String,
@@ -203,6 +269,7 @@ pub(crate) struct Registrations {
     workflow: Value,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Registrations {
     pub(crate) fn load(
         client: Arc<Client>,
@@ -238,7 +305,7 @@ impl Registrations {
                 }
             }
         };
-        if selected != view.effective_config {
+        if !same_config(selected, &view.effective_config) {
             return Err("registration and worktree selected different fixed policies".into());
         }
         let config = documents
