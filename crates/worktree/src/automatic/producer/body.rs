@@ -1,7 +1,54 @@
 //! Copied fixture inputs have a cache lifetime; their original bytes have evidence custody.
 //! Membership comes from the actual copy producer or a finite current-custodian plan.
+use vstd::contrib::exec_spec::ExecSpecEq;
+#[cfg(not(verus_keep_ghost))]
+use vstd::prelude::verus;
+#[cfg(verus_keep_ghost)]
+use vstd::prelude::*;
+
+verus! {
+/// Admission uses the registered length and digest of the copy, including for equal-length replacements.
+pub(crate) fn copied_content_matches(digest: &str, length: u64, wanted: &str, wanted_length: u64) -> (matches: bool)
+    ensures matches == (digest@ == wanted@ && length == wanted_length),
+{
+    <&str>::exec_eq(digest, wanted) && length == wanted_length
+}
+
+/// A changed member takes precedence. Only an unchanged member needs its retained original rechecked.
+pub(crate) fn admit_copy<M: FnOnce() -> Result<bool, String>, O: FnOnce() -> Result<bool, String>>(
+    same_identity: bool, member: M, original: O,
+) -> (result: Result<(), String>)
+    requires same_identity ==> member.requires(()),
+        (same_identity && member.ensures((), Ok::<bool,String>(true))) ==> original.requires(()),
+    ensures
+        !same_identity ==> (result matches Err(e) && e@ == "copied body differs or is partial; preserve original member"@),
+        same_identity ==> (
+            (result matches Err(e) && member.ensures((), Err::<bool,String>(e)))
+            || (member.ensures((), Ok::<bool,String>(false)) && (result matches Err(e) && e@ == "copied body differs or is partial; preserve original member"@))
+            || (member.ensures((), Ok::<bool,String>(true)) && (
+                (result matches Err(e) && original.ensures((), Err::<bool,String>(e)))
+                || (original.ensures((), Ok::<bool,String>(false)) && (result matches Err(e) && e@ == "copied input original changed before removal"@))
+                || (original.ensures((), Ok::<bool,String>(true)) && result.is_ok())
+            ))
+        ),
+{
+    if !same_identity || !member()? {
+        return Err("copied body differs or is partial; preserve original member".to_string());
+    }
+    if !original()? { return Err("copied input original changed before removal".to_string()); }
+    Ok(())
+}
+
+pub(crate) fn protected_source(committed: bool, staged: bool) -> (keep: bool)
+    ensures keep == (committed || staged),
+{
+    committed || staged
+}
+}
+#[cfg(not(verus_keep_ghost))]
 use super::*;
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Body {
@@ -16,6 +63,7 @@ pub(super) struct Body {
     nested_consumers: Vec<NestedConsumer>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NestedConsumer {
@@ -29,6 +77,7 @@ struct NestedConsumer {
 
 // The exclusive nested lease prevents new reference publication while this
 // reads the exact existing registry. No directory/object discovery is involved.
+#[cfg(not(verus_keep_ghost))]
 fn nested_released(
     allocation: &Path,
     member: &str,
@@ -77,6 +126,7 @@ fn nested_released(
     Ok(true)
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn input(path: &Path) -> Result<(String, u64), String> {
     let m = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
     if !m.is_file() {
@@ -86,6 +136,7 @@ fn input(path: &Path) -> Result<(String, u64), String> {
     Ok((digest, m.len()))
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn original(
     directory: &Path,
     source: &Path,
@@ -121,6 +172,7 @@ fn original(
     Ok((name, digest, length, identity))
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn register(
     store: Store,
     i: usize,
@@ -260,6 +312,7 @@ fn register(
     Ok(store.directory.join(name))
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl TemporaryHost {
     /// A real fixture move carries only its already enrolled copy members.
     /// Publish destination membership before rename; originals and old intents survive.
@@ -469,6 +522,7 @@ impl TemporaryHost {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Custody {
@@ -478,6 +532,7 @@ struct Custody {
     reason: String,
     objects: Vec<Selection>,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Selection {
@@ -487,6 +542,7 @@ struct Selection {
     intent: Receipt,
     members: Vec<Member>,
 }
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Member {
@@ -501,6 +557,7 @@ struct Member {
     nested_consumers: Vec<NestedConsumer>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Manager {
     pub(in crate::automatic) fn adopt_fixture_bodies(
         &self,
@@ -665,6 +722,7 @@ impl Manager {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn protect_source(
     r: &mut Runner,
     allocation: &Path,
@@ -699,13 +757,14 @@ fn protect_source(
             .to_owned();
         let tree = r.tree(&directory, &observed.head)?;
         let index = start::paths(r.git(&directory, &["ls-files", "-z"])?)?;
-        if tree.contains_key(&relative) || index.contains(&relative) {
+        if protected_source(tree.contains_key(&relative), index.contains(&relative)) {
             return Err("copied body is committed or staged source; preserve it".into());
         }
     }
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(super) fn drain(
     policy: &ProducerPolicy,
     inputs: &PolicyInputs,
@@ -835,16 +894,19 @@ pub(super) fn drain(
                     // unlink and rechecks physical identity afterwards. Keep
                     // all live admission here instead of repeating content and
                     // Git reads on both sides of intent publication.
-                    if crate::ownership::identity(&path)? != before_id
-                        || input(&path)? != (body.sha256.clone(), body.length)
-                    {
-                        return Err(
-                            "copied body differs or is partial; preserve original member".into(),
-                        );
-                    }
-                    if fingerprint(&original)? != original_id {
-                        return Err("copied input original changed before removal".into());
-                    }
+                    admit_copy(
+                        crate::ownership::identity(&path)? == before_id,
+                        || {
+                            let (digest, length) = input(&path)?;
+                            Ok(copied_content_matches(
+                                &digest,
+                                length,
+                                &body.sha256,
+                                body.length,
+                            ))
+                        },
+                        || Ok(fingerprint(&original)? == original_id),
+                    )?;
                     protect_source(r, &allocation, member, body.git_root.as_deref())?;
                     inputs.stable(r)?;
                     lease.stable()?;
@@ -899,6 +961,7 @@ pub(super) fn drain(
     Ok(row)
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(super) fn fingerprint(path: &Path) -> Result<String, String> {
     let m = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
     #[cfg(unix)]

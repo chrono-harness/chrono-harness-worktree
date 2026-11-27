@@ -81,6 +81,33 @@ mod process_boundaries;
 
 verus! {
 #[cfg(verus_keep_ghost)]
+fn copied_members_require_both_observations_before_unlink(digest: &str, other: &str, n: u64, size: u64)
+    requires digest@ != other@, n != size,
+{
+    use policy::copied_body::{admit_copy, copied_content_matches, protected_source};
+    let mismatch = copied_content_matches(digest,n,other,n);
+    let size_mismatch = copied_content_matches(digest,n,digest,size);
+    let bytes = copied_content_matches(digest,n,digest,n);
+    assert(!mismatch && !size_mismatch && bytes);
+    let changed = admit_copy(false, || -> Result<bool,String> requires false { Ok(true) },
+        || -> Result<bool,String> requires false { Ok(true) });
+    assert(changed matches Err(e) && e@ == "copied body differs or is partial; preserve original member"@);
+    let replaced = admit_copy(true, || -> (r: Result<bool,String>) ensures r==Ok::<bool,String>(false) { Ok(false) },
+        || -> Result<bool,String> requires false { Ok(true) });
+    assert(replaced matches Err(e) && e@ == "copied body differs or is partial; preserve original member"@);
+    let original = admit_copy(true, || -> (r: Result<bool,String>) ensures r==Ok::<bool,String>(true) { Ok(true) },
+        || -> (r: Result<bool,String>) ensures r==Ok::<bool,String>(false) { Ok(false) });
+    assert(original matches Err(e) && e@ == "copied input original changed before removal"@);
+    let exact = admit_copy(true, || -> (r: Result<bool,String>) ensures r==Ok::<bool,String>(true) { Ok(true) },
+        || -> (r: Result<bool,String>) ensures r==Ok::<bool,String>(true) { Ok(true) });
+    assert(exact.is_ok());
+    let staged=protected_source(false,true); let committed=protected_source(true,false);
+    let ordinary=protected_source(false,false);
+    assert(staged && committed && !ordinary);
+}
+
+
+#[cfg(verus_keep_ghost)]
 fn observation_uses_the_owners_exit_and_both_original_times() {
     use policy::ObservationAgeReply::*;
     let fresh = policy::observation_age_reply(0, true, true, false);

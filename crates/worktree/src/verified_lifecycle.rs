@@ -6,6 +6,10 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 #[cfg(verus_keep_ghost)]
+#[path = "automatic/producer/body.rs"]
+pub mod copied_body;
+
+#[cfg(verus_keep_ghost)]
 #[path = "document.rs"]
 mod document;
 #[cfg(not(verus_keep_ghost))]
