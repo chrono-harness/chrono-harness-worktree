@@ -1748,7 +1748,20 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/worktree/src/retention.rs",
@@ -1772,7 +1785,20 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree/src/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle"
+          },
+          {
+            "path": "crates/worktree-tests/tests/verified_lifecycle.rs",
+            "operation": "verify.worktree-lifecycle-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/worktree/src/start.rs",

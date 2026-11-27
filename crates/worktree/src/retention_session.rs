@@ -1,7 +1,47 @@
 //! Versioned final-original protocol over a Unix socket. JSON travels on stdout and kernel capabilities on the socket.
+#![allow(unexpected_cfgs)]
+use vstd::prelude::*;
+
+verus! {
+pub(crate) const DESCRIPTOR_BATCH: usize = 32;
+
+pub(crate) fn read_descriptor_batch(count: usize) -> (read: Result<bool, &'static str>)
+    ensures
+        count == 0 ==> read == Ok::<bool, &str>(false),
+        0 < count <= DESCRIPTOR_BATCH ==> read == Ok::<bool, &str>(true),
+        count > DESCRIPTOR_BATCH ==> read == Err::<bool, &str>("invalid removal descriptor count"),
+{
+    if count > DESCRIPTOR_BATCH { Err("invalid removal descriptor count") }
+    else { Ok(count > 0) }
+}
+
+pub(crate) fn check_descriptor_marker(bytes: usize, marker: u8, truncated: bool)
+    -> (result: Result<(), &'static str>)
+    ensures
+        result.is_ok() == (bytes == 1 && marker == 1 && !truncated),
+        result.is_err() ==> result == Err::<(), &str>("invalid removal descriptor transfer"),
+{
+    if bytes == 1 && marker == 1 && !truncated { Ok(()) }
+    else { Err("invalid removal descriptor transfer") }
+}
+
+pub(crate) fn batch_finished(declared: usize, received: usize) -> (done: Result<bool, &'static str>)
+    ensures
+        received != declared ==> done == Err::<bool, &str>("incomplete removal descriptor transfer"),
+        received == declared ==> done == Ok::<bool, &str>(declared < DESCRIPTOR_BATCH),
+{
+    if received != declared { Err("incomplete removal descriptor transfer") }
+    else { Ok(declared < DESCRIPTOR_BATCH) }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use rustix::net::{RecvAncillaryBuffer, RecvAncillaryMessage, RecvFlags, ReturnFlags, recvmsg};
+#[cfg(not(verus_keep_ghost))]
 use serde::de::DeserializeOwned;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     io::{BufRead, BufReader, IoSliceMut, Write},
     mem::MaybeUninit,
@@ -14,12 +54,14 @@ use std::{
     process::{Child, ChildStdout, Command, Stdio},
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Session {
     child: Child,
     socket: UnixStream,
     output: Option<BufReader<ChildStdout>>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Drop for Session {
     fn drop(&mut self) {
         let _ = self.socket.shutdown(Shutdown::Write);
@@ -28,6 +70,7 @@ impl Drop for Session {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Session {
     pub(crate) fn open(root: &Path) -> Result<Self, String> {
         let (socket, input) = UnixStream::pair().map_err(|e| e.to_string())?;
@@ -124,19 +167,16 @@ impl Session {
     }
 
     pub(crate) fn descriptors(&mut self) -> Result<Vec<OwnedFd>, String> {
-        const BATCH: usize = 32;
         let mut received = Vec::new();
         loop {
             let count: usize =
                 self.call(json!({"operation":"scoped-descriptors","offset":received.len()}))?;
-            if count > BATCH {
-                return Err("invalid removal descriptor count".into());
-            }
-            if count == 0 {
+            if !read_descriptor_batch(count)? {
                 return Ok(received);
             }
             let mut marker = [0u8];
-            let mut buffer = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(BATCH))];
+            let mut buffer =
+                [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(DESCRIPTOR_BATCH))];
             let mut controls = RecvAncillaryBuffer::new(&mut buffer);
             #[cfg(target_os = "linux")]
             let flags = RecvFlags::CMSG_CLOEXEC;
@@ -149,9 +189,11 @@ impl Session {
                 flags,
             )
             .map_err(|e| e.to_string())?;
-            if message.bytes != 1 || marker != [1] || message.flags.contains(ReturnFlags::CTRUNC) {
-                return Err("invalid removal descriptor transfer".into());
-            }
+            check_descriptor_marker(
+                message.bytes,
+                marker[0],
+                message.flags.contains(ReturnFlags::CTRUNC),
+            )?;
             let before = received.len();
             for message in controls.drain() {
                 if let RecvAncillaryMessage::ScmRights(fds) = message {
@@ -162,10 +204,7 @@ impl Session {
                     }
                 }
             }
-            if received.len() - before != count {
-                return Err("incomplete removal descriptor transfer".into());
-            }
-            if count < BATCH {
+            if batch_finished(count, received.len() - before)? {
                 return Ok(received);
             }
         }
