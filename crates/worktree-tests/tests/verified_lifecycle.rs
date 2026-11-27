@@ -80,6 +80,47 @@ mod git_checkout_boundaries;
 mod process_boundaries;
 
 verus! {
+
+#[cfg(verus_keep_ghost)]
+fn descriptor_replies(declared: usize, delivered: usize, bytes: usize, marker: u8, truncated: bool) {
+    use policy::retention_session::{read_descriptor_batch, check_descriptor_marker, batch_finished};
+    let read = read_descriptor_batch(declared);
+    if declared > 32 { assert(read == Err::<bool, &str>("invalid removal descriptor count")); }
+    else if declared == 0 { assert(read == Ok::<bool, &str>(false)); }
+    else {
+        assert(read == Ok::<bool, &str>(true));
+        let result = check_descriptor_marker(bytes, marker, truncated);
+        if bytes != 1 || marker != 1 || truncated {
+            assert(result == Err::<(), &str>("invalid removal descriptor transfer"));
+        } else {
+            assert(result.is_ok());
+            let finished = batch_finished(declared, delivered);
+            if declared != delivered {
+                assert(finished == Err::<bool, &str>("incomplete removal descriptor transfer"));
+            } else {
+                assert(finished == Ok::<bool, &str>(delivered != 32));
+            }
+        }
+    }
+    let guard = policy::removal::require_descriptors(delivered);
+    assert(guard.is_ok() == (delivered != 0));
+}
+
+#[cfg(verus_keep_ghost)]
+fn full_batch_then_final_batch() {
+    use policy::retention_session::{read_descriptor_batch, batch_finished};
+    let result = read_descriptor_batch(32);
+    assert(result == Ok::<bool, &str>(true));
+    let result = batch_finished(32, 32);
+    assert(result == Ok::<bool, &str>(false));
+    let result = read_descriptor_batch(0);
+    assert(result == Ok::<bool, &str>(false));
+    let result = read_descriptor_batch(1);
+    assert(result == Ok::<bool, &str>(true));
+    let result = batch_finished(1, 1);
+    assert(result == Ok::<bool, &str>(true));
+}
+
 #[cfg(verus_keep_ghost)]
 fn copied_members_require_both_observations_before_unlink(digest: &str, other: &str, n: u64, size: u64)
     requires digest@ != other@, n != size,

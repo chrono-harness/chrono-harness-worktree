@@ -3,6 +3,13 @@ use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
+#[path = "removal.rs"]
+pub(crate) mod removal;
+#[cfg(verus_keep_ghost)]
+#[path = "retention_session.rs"]
+pub(crate) mod retention_session;
+
+#[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
 #[cfg(verus_keep_ghost)]
