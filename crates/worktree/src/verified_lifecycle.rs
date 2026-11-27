@@ -3,6 +3,16 @@ use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
+#[path = "host_config.rs"]
+pub(crate) mod host_config;
+#[cfg(verus_keep_ghost)]
+#[path = "check_inputs/observation_age.rs"]
+pub(crate) mod observation_age;
+#[cfg(not(verus_keep_ghost))]
+pub use crate::check_inputs::observation_age::{ObservationAgeReply, observation_age_reply};
+#[cfg(verus_keep_ghost)]
+pub use observation_age::{ObservationAgeReply, observation_age_reply};
+#[cfg(verus_keep_ghost)]
 #[path = "facts.rs"]
 pub(crate) mod facts;
 #[cfg(verus_keep_ghost)]
@@ -252,25 +262,6 @@ pub fn index_entry_changed(stage: &str, mode: &str, oid: &str, expected: Option<
     } else {
         Err("invalid Git index stage")
     }
-}
-
-pub enum ObservationAgeReply { Fresh, Stale, Diagnostic, Invalid }
-
-pub fn observation_age_reply(exit: i32, stdout_empty: bool, message_empty: bool,
-    stale_diagnostic: bool) -> (reply: ObservationAgeReply)
-    ensures match reply {
-        ObservationAgeReply::Fresh => exit == 0 && stdout_empty && message_empty,
-        ObservationAgeReply::Stale => exit == 1 && stdout_empty && stale_diagnostic,
-        ObservationAgeReply::Diagnostic => exit == 2 && stdout_empty && !message_empty,
-        ObservationAgeReply::Invalid => !stdout_empty || (
-            !(exit == 0 && message_empty) && !(exit == 1 && stale_diagnostic)
-            && !(exit == 2 && !message_empty)),
-    },
-{
-    if stdout_empty && exit == 0 && message_empty { ObservationAgeReply::Fresh }
-    else if stdout_empty && exit == 1 && stale_diagnostic { ObservationAgeReply::Stale }
-    else if stdout_empty && exit == 2 && !message_empty { ObservationAgeReply::Diagnostic }
-    else { ObservationAgeReply::Invalid }
 }
 
 pub fn reuse_cached_observation(cached_fresh: bool, matching_context: bool, current_fresh: bool)

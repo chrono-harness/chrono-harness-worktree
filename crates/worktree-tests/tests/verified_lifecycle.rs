@@ -82,6 +82,28 @@ mod process_boundaries;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn selected_host_target(version: Option<u64>) {
+    use policy::host_config::direct_target;
+    let nested = direct_target(true, version);
+    let direct = direct_target(false, version);
+    assert(!nested);
+    assert(direct == (version == Some(3u64) || version == Some(4u64)));
+}
+
+#[cfg(verus_keep_ghost)]
+fn age_reply_result(message: &str, malformed: String) {
+    use policy::observation_age::{age_result, ObservationAgeReply};
+    let invalid = || -> (text: String) ensures text@ == malformed@, { malformed.clone() };
+    let fresh = age_result(ObservationAgeReply::Fresh, message, invalid);
+    let stale = age_result(ObservationAgeReply::Stale, message, invalid);
+    let diagnostic = age_result(ObservationAgeReply::Diagnostic, message, invalid);
+    let bad = age_result(ObservationAgeReply::Invalid, message, invalid);
+    assert(fresh == Ok::<bool, String>(true) && stale == Ok::<bool, String>(false));
+    assert(diagnostic is Err && diagnostic->Err_0@ == message@);
+    assert(bad is Err && bad->Err_0@ == malformed@);
+}
+
+#[cfg(verus_keep_ghost)]
 fn retained_original_publication(selected: Result<bool, u8>, response: Result<bool, u8>) {
     use policy::retention::publish_accepted;
     let accepts = |_owner: &u8| -> (out: Result<bool, u8>)
