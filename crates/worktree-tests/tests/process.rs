@@ -342,3 +342,43 @@ fn kernel_wait_boundaries(nanos: u128, interrupted: bool) {
     assert(zero is Again && error is Failed && signal is Again && event is Ready);
 }
 }
+
+#[test]
+#[cfg(not(verus_keep_ghost))]
+fn registered_path_reply_belongs_to_the_exact_query() {
+    use chrono_worktree::registered_nonartifact_paths;
+    let paths = ["说明.txt", "cache/a", "message.py", "说明.txt"].map(String::from);
+    let artifacts = serde_json::json!([{"path":"cache/","tracked":false}]);
+    let outside = "registration returned paths outside the queried batch";
+    for (reply, accepted) in [
+        (vec![], true),
+        (vec!["说明.txt", "message.py", "说明.txt"], true),
+        (vec!["说明.txt", "说明.txt"], true),
+        (vec!["说明.txt", "说明.txt", "说明.txt"], false),
+        (vec!["message.py", "cache/a"], false),
+        (vec!["unqueried.txt"], false),
+    ] {
+        let reply: Vec<String> = reply.into_iter().map(String::from).collect();
+        let result = registered_nonartifact_paths(&artifacts, &paths, |request| {
+            assert_eq!(
+                *request,
+                serde_json::json!({
+                    "operation":"nonartifact-paths", "config":{"artifacts":artifacts}, "paths":paths,
+                })
+            );
+            Ok(reply.clone())
+        });
+        assert_eq!(
+            result,
+            if accepted {
+                Ok(reply)
+            } else {
+                Err(outside.into())
+            }
+        );
+    }
+    assert_eq!(
+        registered_nonartifact_paths(&artifacts, &paths, |_| Err("query failed".into())),
+        Err("query failed".into()),
+    );
+}

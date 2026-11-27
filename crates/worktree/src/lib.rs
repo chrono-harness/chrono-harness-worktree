@@ -118,6 +118,9 @@ mod recovery;
 #[cfg(not(verus_keep_ghost))]
 mod registration;
 #[cfg(not(verus_keep_ghost))]
+#[doc(hidden)]
+pub use registration::registered_nonartifact_paths;
+#[cfg(not(verus_keep_ghost))]
 mod remote;
 #[cfg(not(verus_keep_ghost))]
 mod removal;

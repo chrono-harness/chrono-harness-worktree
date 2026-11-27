@@ -203,6 +203,30 @@ fn copied_members_require_both_observations_before_unlink(digest: &str, other: &
 
 
 #[cfg(verus_keep_ghost)]
+fn registration_returns_only_requested_occurrences_in_order(a: String, b: String)
+    requires a@ != b@,
+{
+    use policy::registration::{ordered_paths, remaining_paths, same_config};
+    let input = vec![a.clone(), b.clone(), a.clone()];
+    let empty = Vec::<String>::new();
+    let all = vec![a.clone(), b.clone(), a.clone()];
+    let gap = vec![a.clone(), a.clone()];
+    let excess = vec![b.clone(), b.clone()];
+    let reordered = vec![b.clone(), a.clone(), b.clone()];
+    let no_paths = ordered_paths(&input, &empty);
+    let same = ordered_paths(&input, &all);
+    let filtered = ordered_paths(&input, &gap);
+    let duplicate = ordered_paths(&input, &excess);
+    let reversed = ordered_paths(&input, &reordered);
+    let extra = ordered_paths(&empty, &gap);
+    let matching = same_config(a.as_str(), a.as_str());
+    let changed = same_config(a.as_str(), b.as_str());
+    proof { reveal_with_fuel(remaining_paths, 5); }
+    assert(no_paths && same && filtered && !duplicate && !reversed && !extra);
+    assert(matching && !changed);
+}
+
+#[cfg(verus_keep_ghost)]
 fn local_request_is_unprepared_and_has_an_absolute_root() {
     use policy::prepared::accepts_local_request;
     let schema = "chrono-check-input-request/v1";

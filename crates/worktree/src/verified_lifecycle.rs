@@ -3,6 +3,10 @@ use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
+#[path = "registration.rs"]
+pub(crate) mod registration;
+
+#[cfg(verus_keep_ghost)]
 #[path = "prepared.rs"]
 pub(crate) mod prepared;
 
