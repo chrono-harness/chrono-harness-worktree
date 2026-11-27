@@ -466,6 +466,11 @@ pub fn reconstruct(options: Start, plan_path: &str) -> Result<serde_json::Value,
 pub use automatic::service::maintain_host_operations;
 
 #[doc(hidden)]
+#[cfg(feature = "producer-birth-test")]
+#[cfg(not(verus_keep_ghost))]
+pub use maintenance_signal::announce_adopted as announce_maintenance;
+
+#[doc(hidden)]
 #[cfg(unix)]
 #[cfg(not(verus_keep_ghost))]
 pub use automatic::service::serve as serve_maintenance_socket;

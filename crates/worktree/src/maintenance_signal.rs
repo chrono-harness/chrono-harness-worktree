@@ -1,24 +1,58 @@
 //! The owner of the worktree maintenance socket accepts bounded, nonblocking wake-up hints.
+use vstd::prelude::*;
+
+verus! {
+pub(crate) fn valid_hint_length(length: usize) -> (valid: bool)
+    ensures valid == (0 < length && length <= 64),
+{
+    length > 0 && length <= 64
+}
+
+/// Only adopted or failed wake requests have a receipt. Keep the original failure.
+pub(crate) fn wake_receipt<E>(wake: Result<bool, E>) -> (receipt: Option<(&'static str, Option<E>)>)
+    ensures match wake {
+        Ok(false) => receipt.is_none(),
+        Ok(true) => receipt matches Some((status, None)) && status@ == "requested"@,
+        Err(error) => receipt matches Some((status, Some(original))) &&
+            status@ == "wake-failed"@ && original == error,
+    },
+{
+    match wake {
+        Ok(false) => None,
+        Ok(true) => Some(("requested", None)),
+        Err(error) => Some(("wake-failed", Some(error))),
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::document::{decode, no_symlink_parents, relative_path, sha256};
+#[cfg(not(verus_keep_ghost))]
 use serde::{Deserialize, Serialize};
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     cell::Cell,
     fs,
-    io::ErrorKind,
+    io::{self, ErrorKind, Write},
     os::unix::net::UnixDatagram,
     path::{Component, Path, PathBuf},
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) const POLICY_PATH: &str = ".chrono-harness/maintenance.json";
+#[cfg(not(verus_keep_ghost))]
 pub(crate) const CONTEXT_ENV: &str = "CHRONO_MAINTENANCE_CONTEXT";
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RequestContext {
     source_root: PathBuf,
     owner_root: PathBuf,
 }
+#[cfg(not(verus_keep_ghost))]
 impl RequestContext {
     fn roots(&self) -> [&Path; 2] {
         [&self.source_root, &self.owner_root]
@@ -54,6 +88,7 @@ impl RequestContext {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Policy {
@@ -61,6 +96,7 @@ pub struct Policy {
     pub state_directory: String,
     pub socket: String,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Policy {
     pub(crate) fn validate(&self) -> Result<(), String> {
         relative_path(self.state_directory.trim_end_matches('/'))?;
@@ -80,6 +116,7 @@ impl Policy {
         no_symlink_parents(root, &self.socket)
     }
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn adopted(root: &Path) -> Result<Option<(Policy, Vec<u8>)>, String> {
     let bytes = match fs::read(no_symlink_parents(root, POLICY_PATH)?) {
         Ok(bytes) => bytes,
@@ -91,8 +128,11 @@ pub(crate) fn adopted(root: &Path) -> Result<Option<(Policy, Vec<u8>)>, String> 
     Ok(Some((policy, bytes)))
 }
 
+#[cfg(not(verus_keep_ghost))]
 thread_local! {static DEPTH:Cell<usize>=const{Cell::new(0)};}
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct RoundGuard;
+#[cfg(not(verus_keep_ghost))]
 impl RoundGuard {
     pub(crate) fn active() -> bool {
         DEPTH.with(|depth| depth.get() > 0)
@@ -102,14 +142,16 @@ impl RoundGuard {
         Self
     }
 }
+#[cfg(not(verus_keep_ghost))]
 impl Drop for RoundGuard {
     fn drop(&mut self) {
         DEPTH.with(|depth| depth.set(depth.get() - 1));
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn send(path: &Path, hint: &[u8]) -> Result<(), String> {
-    if hint.is_empty() || hint.len() > 64 {
+    if !valid_hint_length(hint.len()) {
         return Err("invalid maintenance activation hint length".into());
     }
     let socket = UnixDatagram::unbound().map_err(|e| e.to_string())?;
@@ -121,7 +163,8 @@ pub(crate) fn send(path: &Path, hint: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn announce_adopted(root: &Path, reason: &str) {
+#[cfg(not(verus_keep_ghost))]
+pub fn announce_adopted(root: &Path, reason: &str) {
     if RoundGuard::active() {
         return;
     }
@@ -150,16 +193,14 @@ pub(crate) fn announce_adopted(root: &Path, reason: &str) {
         send(&socket, reason.as_bytes())?;
         Ok(true)
     })();
-    match result {
-        Ok(false) => return,
-        Ok(true) => {
-            receipt["status"] = json!("requested");
-            receipt["accepted"] = Value::Bool(true);
-        }
-        Err(error) => {
-            receipt["status"] = json!("wake-failed");
-            receipt["error"] = json!(error);
-        }
+    let Some((status, error)) = wake_receipt(result) else {
+        return;
+    };
+    receipt["status"] = json!(status);
+    receipt["accepted"] = Value::Bool(error.is_none());
+    if let Some(error) = error {
+        receipt["error"] = json!(error);
     }
-    eprintln!("W_MAINTENANCE_ACTIVATION: {receipt}");
+    // The owner has already handed off the work, even if the notice has no reader.
+    let _ = writeln!(io::stderr().lock(), "W_MAINTENANCE_ACTIVATION: {receipt}");
 }

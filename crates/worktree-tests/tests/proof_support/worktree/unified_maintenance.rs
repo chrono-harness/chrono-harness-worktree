@@ -13,6 +13,18 @@ verus! {
 fn expect(actual: bool) requires actual { if !actual { panic!(); } }
 
 
+fn maintenance_wakes_keep_the_boundaries_and_the_original_failure(length: usize, error: u64) {
+    use policy::maintenance_signal::{valid_hint_length, wake_receipt};
+    let allowed = valid_hint_length(length);
+    if length == 0 || length > 64 { expect(!allowed); } else { expect(allowed); }
+    let absent = wake_receipt(Ok::<bool,u64>(false));
+    let delivered = wake_receipt(Ok::<bool,u64>(true));
+    let failed = wake_receipt(Err::<bool,u64>(error));
+    expect(absent.is_none());
+    assert(delivered matches Some((status, None)) && status@ == "requested"@);
+    assert(failed matches Some((status, Some(original))) && status@ == "wake-failed"@ && original == error);
+}
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn maintenance_keeps_coordinator_and_invoking_roots_in_order() {
     let roots = policy::maintenance_exclusions(17u64, u64::MAX);

@@ -38,6 +38,10 @@ pub use crate::remote::{RemoteCheck, RemoteSelection};
 pub use remote::{Advertised, already_absent, record_ref, retained_branch, single_endpoint};
 
 #[cfg(verus_keep_ghost)]
+#[path = "maintenance_signal.rs"]
+pub(crate) mod maintenance_signal;
+
+#[cfg(verus_keep_ghost)]
 #[path = "maintenance.rs"]
 mod maintenance_verification;
 #[cfg(not(verus_keep_ghost))]
