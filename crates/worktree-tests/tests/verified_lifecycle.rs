@@ -173,6 +173,39 @@ fn copied_members_require_both_observations_before_unlink(digest: &str, other: &
 
 
 #[cfg(verus_keep_ghost)]
+fn local_request_is_unprepared_and_has_an_absolute_root() {
+    use policy::prepared::accepts_local_request;
+    let schema = "chrono-check-input-request/v1";
+    proof { reveal_strlit("chrono-check-input-request/v1"); reveal_strlit("v2");
+        reveal_strlit("local"); reveal_strlit("ci");
+        assert("local"@.len() != "ci"@.len());
+        assert("chrono-check-input-request/v1"@.len() != "v2"@.len());
+    }
+    let valid = accepts_local_request(schema, "local", true, false, false);
+    let other_schema = accepts_local_request("v2", "local", true, false, false);
+    let from_ci = accepts_local_request(schema, "ci", true, false, false);
+    let relative = accepts_local_request(schema, "local", false, false, false);
+    let native = accepts_local_request(schema, "local", true, true, false);
+    let prepared = accepts_local_request(schema, "local", true, false, true);
+    assert(valid && !other_schema && !from_ci && !relative && !native && !prepared);
+}
+
+#[cfg(verus_keep_ghost)]
+fn local_request_uses_the_declared_profile(initial: bool, all: bool) {
+    use policy::prepared::selected_profile;
+    let ordinary = "delta";
+    let inventory = "initial";
+    let missing = selected_profile(ordinary, None, initial, all);
+    let normal = selected_profile(ordinary, Some(inventory), false, all);
+    let first = selected_profile(ordinary, Some(inventory), true, true);
+    let invalid = selected_profile(ordinary, Some(inventory), true, false);
+    assert(missing == Ok::<&str, &str>(ordinary));
+    assert(normal == Ok::<&str, &str>(ordinary));
+    assert(first == Ok::<&str, &str>(inventory));
+    assert(invalid == Err::<&str, &str>("initial inventory requires a bare check"));
+}
+
+#[cfg(verus_keep_ghost)]
 fn observation_uses_the_owners_exit_and_both_original_times() {
     use policy::ObservationAgeReply::*;
     let fresh = policy::observation_age_reply(0, true, true, false);

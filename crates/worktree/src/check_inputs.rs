@@ -262,7 +262,7 @@ fn produce(
     bytes: &[u8],
 ) -> Result<PreparedCheck, String> {
     req.validate(&config)?;
-    if req.source != "local" || req.prepared.is_some() || config.host_config != req.host_config {
+    if config.host_config != req.host_config {
         return Err("local input source/host binding mismatch".into());
     }
     let _read_scope = crate::retention::read_scope(&req.host_root)?;
