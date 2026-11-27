@@ -82,6 +82,35 @@ mod process_boundaries;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn full_git_oids(bytes: &[u8]) {
+    use policy::facts::valid_git_oid;
+    let answer = valid_git_oid(bytes);
+    assert(answer == ((bytes.len() == 40 || bytes.len() == 64)
+        && (forall|i: int| 0 <= i < bytes.len() ==> ((48 <= #[trigger] bytes@[i] <= 57)
+            || (97 <= bytes@[i] <= 102)))
+        && !(forall|i: int| 0 <= i < bytes.len() ==> #[trigger] bytes@[i] == 48)));
+}
+
+#[cfg(verus_keep_ghost)]
+fn parent_header_boundaries() {
+    use policy::facts::{parent_header, ParentLine};
+    let end = parent_header(&[]);
+    let tree = parent_header(&[116u8, 114u8, 101u8, 101u8, 32u8, 49u8]);
+    let signed = parent_header(&[32u8, 112u8, 97u8, 114u8, 101u8, 110u8, 116u8, 32u8, 102u8]);
+    let malformed_prefix = parent_header(&[112u8, 97u8, 114u8, 101u8, 110u8, 116u8, 120u8]);
+    let empty_parent_line = [112u8, 97u8, 114u8, 101u8, 110u8, 116u8, 32u8];
+    proof { assert(empty_parent_line@.subrange(0, 7) =~= seq![112u8, 97, 114, 101, 110, 116, 32]); }
+    let empty_parent = parent_header(&empty_parent_line);
+    let parent_line = [112u8, 97u8, 114u8, 101u8, 110u8, 116u8, 32u8, 97u8, 98u8, 99u8];
+    proof { assert(parent_line@.subrange(0, 7) =~= seq![112u8, 97, 114, 101, 110, 116, 32]); }
+    let parent = parent_header(&parent_line);
+    assert(end is End && tree is Other && signed is Other && malformed_prefix is Other);
+    assert(empty_parent is Parent && empty_parent->Parent_0.len() == 0);
+    assert(parent is Parent);
+    assert(parent->Parent_0@ =~= seq![97u8, 98u8, 99u8]);
+}
+
+#[cfg(verus_keep_ghost)]
 fn reconstruction_declarations(reason: &str) {
     use policy::reconstruct::{valid_choice, Action};
     proof { reveal_strlit(""); }

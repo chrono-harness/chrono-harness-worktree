@@ -79,10 +79,7 @@ pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, String> {
 }
 #[cfg(not(verus_keep_ghost))]
 pub(crate) fn valid_digest(text: &str) -> bool {
-    text.len() == 64
-        && text
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    crate::verified_owner_publication::valid_stage_digest(text.as_bytes())
 }
 #[cfg(not(verus_keep_ghost))]
 pub(crate) fn relative_path(value: &str) -> Result<(), String> {
