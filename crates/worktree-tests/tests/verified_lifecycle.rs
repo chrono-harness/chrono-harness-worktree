@@ -82,6 +82,23 @@ mod process_boundaries;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn retained_original_publication(selected: Result<bool, u8>, response: Result<bool, u8>) {
+    use policy::retention::publish_accepted;
+    let accepts = |_owner: &u8| -> (out: Result<bool, u8>)
+        ensures out == selected, { selected };
+    let publish = |_owner: &u8| -> (out: Result<bool, u8>)
+        ensures out == response, { response };
+    let absent = publish_accepted(None::<u8>, accepts, publish);
+    let adopted = publish_accepted(Some(7u8), accepts, publish);
+    assert(absent == Ok::<bool, u8>(false));
+    assert(adopted == match selected {
+        Ok(false) => Ok::<bool, u8>(false),
+        Ok(true) => response,
+        Err(code) => Err::<bool, u8>(code),
+    });
+}
+
+#[cfg(verus_keep_ghost)]
 fn full_git_oids(bytes: &[u8]) {
     use policy::facts::valid_git_oid;
     let answer = valid_git_oid(bytes);

@@ -29,6 +29,9 @@ pub(crate) mod reconstruct;
 #[path = "removal.rs"]
 pub(crate) mod removal;
 #[cfg(verus_keep_ghost)]
+#[path = "retention.rs"]
+pub(crate) mod retention;
+#[cfg(verus_keep_ghost)]
 #[path = "retention_session.rs"]
 pub(crate) mod retention_session;
 

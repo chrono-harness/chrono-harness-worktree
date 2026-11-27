@@ -1,7 +1,39 @@
 //! Host-opted original custody. Without a host policy the worktree writes only its own files.
+use vstd::prelude::*;
+
+verus! {
+/// The caller uses its own writer only when the host returns Ok(false).
+pub(crate) fn publish_accepted<O, E, A, P>(owner: Option<O>, accepts: A, publish: P)
+    -> (answer: Result<bool, E>)
+    where A: FnOnce(&O) -> Result<bool, E>, P: FnOnce(&O) -> Result<bool, E>,
+    requires forall|o: &O| accepts.requires((o,)),
+        forall|o: &O| publish.requires((o,)),
+    ensures match owner {
+        None => answer == Ok::<bool, E>(false),
+        Some(o) => exists|selected: Result<bool, E>| accepts.ensures((&o,), selected)
+            && match selected {
+                Ok(true) => publish.ensures((&o,), answer),
+                Ok(false) => answer == Ok::<bool, E>(false),
+                Err(error) => answer == Err::<bool, E>(error),
+            },
+    },
+{
+    let Some(owner) = owner else { return Ok(false); };
+    match accepts(&owner) {
+        Ok(true) => publish(&owner),
+        Ok(false) => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+}
+
+#[cfg(not(verus_keep_ghost))]
 use crate::retention_session::Session;
+#[cfg(not(verus_keep_ghost))]
 use serde::de::DeserializeOwned;
+#[cfg(not(verus_keep_ghost))]
 use serde_json::{Value, json};
+#[cfg(not(verus_keep_ghost))]
 use std::{
     cell::RefCell,
     collections::BTreeMap,
@@ -14,14 +46,17 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) const POLICY_PATH: &str = ".chrono-harness/retention.json";
 
+#[cfg(not(verus_keep_ghost))]
 thread_local! {
     static SESSIONS: RefCell<BTreeMap<(PathBuf, bool), Weak<RefCell<Session>>>> = RefCell::new(BTreeMap::new());
 }
 
 /// Forward active host-original capabilities whenever worktree starts a native child.
 /// Duplicates share the original file descriptions, including after this process exits.
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn forward_scope() -> Result<crate::process_fds::Scope, String> {
     use std::os::fd::AsFd;
     let sessions = SESSIONS.with(|all| {
@@ -38,12 +73,14 @@ pub(crate) fn forward_scope() -> Result<crate::process_fds::Scope, String> {
     crate::process_fds::Scope::new(&borrowed)
 }
 
+#[cfg(not(verus_keep_ghost))]
 #[derive(Clone)]
 pub(crate) struct Inventory {
     root: PathBuf,
     session: Rc<RefCell<Session>>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Inventory {
     pub(crate) fn adopted(root: &Path) -> Result<Option<Self>, String> {
         match fs::symlink_metadata(root.join(POLICY_PATH)) {
@@ -143,11 +180,13 @@ impl Inventory {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Guard {
     owner: Inventory,
     close: Option<Value>,
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Guard {
     fn new(owner: Inventory, close: Value) -> Self {
         Self {
@@ -157,6 +196,7 @@ impl Guard {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 impl Drop for Guard {
     fn drop(&mut self) {
         if let Some(close) = self.close.take() {
@@ -166,24 +206,30 @@ impl Drop for Guard {
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) type ReadScope = Option<Guard>;
 
+#[cfg(not(verus_keep_ghost))]
 fn scope(owner: Inventory, path: Option<&str>, inputs: bool) -> Result<Guard, String> {
     let token: u64 = owner.publication(json!({"kind":"scope","path":path,"inputs":inputs}))?;
     Ok(Guard::new(owner, json!({"kind":"end-scope","token":token})))
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn read_scope(root: &Path) -> Result<ReadScope, String> {
     Inventory::adopted(root)?
         .map(|owner| scope(owner, None, true))
         .transpose()
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn published_output_scope(p: &Publication) -> Result<ReadScope, String> {
     scope(p.owner.clone(), Some(&p.path), false).map(Some)
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn publication_read_scope(p: &Publication) -> Result<ReadScope, String> {
     scope(p.owner.clone(), Some(&p.path), true).map(Some)
 }
 
+#[cfg(not(verus_keep_ghost))]
 fn read(root: &Path, path: &str, consumer: Option<&str>) -> Result<Option<Guard>, String> {
     let Some(owner) = Inventory::adopted(root)? else {
         return Ok(None);
@@ -192,9 +238,11 @@ fn read(root: &Path, path: &str, consumer: Option<&str>) -> Result<Option<Guard>
         owner.publication(json!({"kind":"read","path":path,"consumer":consumer}))?;
     Ok(token.map(|token| Guard::new(owner, json!({"kind":"release-read","token":token}))))
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn read_guard(root: &Path, path: &str) -> Result<Option<Guard>, String> {
     read(root, path, None)
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn consumer_read_guard(
     root: &Path,
     path: &str,
@@ -202,12 +250,14 @@ pub(crate) fn consumer_read_guard(
 ) -> Result<Option<Guard>, String> {
     read(root, path, Some(consumer))
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn current_report_role(slot: &str) -> String {
     format!(
         "current-report:{}",
         crate::document::sha256(slot.as_bytes())
     )
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn reference_report(
     root: &Path,
     slot: &str,
@@ -221,6 +271,7 @@ pub(crate) fn reference_report(
         .publication(json!({"kind":"reference-held","slot":slot,"path":path,"inputs":inputs}))?;
     Ok(token.map(|token| Guard::new(owner, json!({"kind":"release-read","token":token}))))
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn settle_report(root: &Path, slot: &str, path: &str) -> Result<(), String> {
     if let Some(owner) = Inventory::adopted(root)? {
         owner.publication::<()>(json!({"kind":"settle","slot":slot,"path":path}))?;
@@ -228,11 +279,13 @@ pub(crate) fn settle_report(root: &Path, slot: &str, path: &str) -> Result<(), S
     Ok(())
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) struct Publication {
     owner: Inventory,
     path: String,
     open: bool,
 }
+#[cfg(not(verus_keep_ghost))]
 impl Publication {
     fn new(owner: Inventory, path: &str) -> Self {
         Self {
@@ -300,6 +353,7 @@ impl Publication {
             .publication(json!({"kind":"complete","path":self.path,"outcome":outcome}))
     }
 }
+#[cfg(not(verus_keep_ghost))]
 impl Drop for Publication {
     fn drop(&mut self) {
         if self.open {
@@ -309,6 +363,7 @@ impl Drop for Publication {
         }
     }
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn create_adopted(
     root: &Path,
     producer: &str,
@@ -329,6 +384,7 @@ pub(crate) fn create_adopted(
     .map_err(|e| e.to_string())?;
     Ok(None)
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn unique_path(directory: &Path, prefix: &str, suffix: &str) -> Result<PathBuf, String> {
     static SEQUENCE: AtomicU64 = AtomicU64::new(0);
     if prefix.contains('/') || suffix.contains('/') {
@@ -345,6 +401,7 @@ pub(crate) fn unique_path(directory: &Path, prefix: &str, suffix: &str) -> Resul
         SEQUENCE.fetch_add(1, Ordering::Relaxed)
     )))
 }
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn copy_adopted(
     p: Option<&Publication>,
     source: &Path,
@@ -361,6 +418,7 @@ pub(crate) fn copy_adopted(
     }
 }
 
+#[cfg(not(verus_keep_ghost))]
 pub(crate) fn publish_owned_original(
     root: &Path,
     producer: &str,
@@ -368,15 +426,15 @@ pub(crate) fn publish_owned_original(
     bytes: &[u8],
     outcome: Value,
 ) -> Result<bool, String> {
-    let Some(owner) = Inventory::adopted(root)? else {
-        return Ok(false);
-    };
-    if !owner.accepts(producer, path)? {
-        return Ok(false);
-    }
-    owner.session.borrow_mut().publish_bytes(
-        json!({"operation":"publish-stream","producer":producer,"path":path,
-        "sha256":crate::document::sha256(bytes),"length":bytes.len(),"outcome":outcome}),
-        bytes,
+    publish_accepted(
+        Inventory::adopted(root)?,
+        |owner| owner.accepts(producer, path),
+        |owner| {
+            owner.session.borrow_mut().publish_bytes(
+                json!({"operation":"publish-stream","producer":producer,"path":path,
+                "sha256":crate::document::sha256(bytes),"length":bytes.len(),"outcome":outcome}),
+                bytes,
+            )
+        },
     )
 }
