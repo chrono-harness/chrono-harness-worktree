@@ -3,11 +3,17 @@ use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
+#[path = "main.rs"]
+pub(crate) mod cli;
+#[cfg(verus_keep_ghost)]
 #[path = "host_config.rs"]
 pub(crate) mod host_config;
 #[cfg(verus_keep_ghost)]
 #[path = "check_inputs/observation_age.rs"]
 pub(crate) mod observation_age;
+#[cfg(verus_keep_ghost)]
+#[path = "process.rs"]
+pub(crate) mod process;
 #[cfg(not(verus_keep_ghost))]
 pub use crate::check_inputs::observation_age::{ObservationAgeReply, observation_age_reply};
 #[cfg(verus_keep_ghost)]

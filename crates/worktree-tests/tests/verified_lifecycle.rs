@@ -82,6 +82,28 @@ mod process_boundaries;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn cli_write_results(code: u8, primary: u32, secondary: u32) {
+    use policy::cli::published_exit;
+    let normal = published_exit::<u32>(code, Ok(()), Ok(()));
+    let stdout = published_exit(code, Err(primary), Ok(()));
+    let stderr = published_exit(code, Ok(()), Err(secondary));
+    let both = published_exit(code, Err(primary), Err(secondary));
+    assert(normal == Ok::<u8, u32>(code));
+    assert(stdout == Err::<u8, u32>(primary) && both == stdout);
+    assert(stderr == Err::<u8, u32>(secondary));
+}
+
+#[cfg(verus_keep_ghost)]
+fn prelaunch_inputs(bytes: usize, pinned: &str, actual: &str) {
+    use policy::process::{executable_matches, transport_limit};
+    let allowed = transport_limit(bytes);
+    if bytes == 0 || bytes > 0x04000000 { assert(!allowed); } else { assert(allowed); }
+    let unpinned = executable_matches(None, actual);
+    let observed = executable_matches(Some(pinned), actual);
+    assert(unpinned && (observed == (pinned@ == actual@)));
+}
+
+#[cfg(verus_keep_ghost)]
 fn selected_host_target(version: Option<u64>) {
     use policy::host_config::direct_target;
     let nested = direct_target(true, version);
