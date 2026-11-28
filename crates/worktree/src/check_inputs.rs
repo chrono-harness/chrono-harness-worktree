@@ -1,4 +1,6 @@
 //! Automatic local endpoint/context production; start/reconstruct own branch birth.
+#[cfg(verus_keep_ghost)]
+use super::facts;
 use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
@@ -6,6 +8,43 @@ use vstd::prelude::verus;
 use vstd::prelude::*;
 
 verus! {
+pub(crate) fn scoped_check_profile(schema: Option<&str>) -> (scoped: bool)
+    ensures scoped == (facts::names(schema, "chrono-ci-check/v1"@)
+        || facts::names(schema, "chrono-ci-check/v2"@) || facts::names(schema, "chrono-ci-check/v3"@)),
+{
+    facts::identity_text(schema, "chrono-ci-check/v1")
+        || facts::identity_text(schema, "chrono-ci-check/v2")
+        || facts::identity_text(schema, "chrono-ci-check/v3")
+}
+
+pub(crate) fn full_check_origin(
+    schema: Option<&str>, destination_matches: bool, role: Option<&str>,
+) -> (valid: bool)
+    ensures valid == (facts::names(schema, "chrono-worktree-origin/v1"@) && destination_matches
+        && (facts::names(role, "integration"@) || facts::names(role, "delivery"@))),
+{
+    facts::identity_text(schema, "chrono-worktree-origin/v1") && destination_matches
+        && (facts::identity_text(role, "integration") || facts::identity_text(role, "delivery"))
+}
+
+pub(crate) fn full_check_birth(
+    status: Option<&str>, destination_matches: bool, fork_matches_base: bool, processes_array: bool,
+) -> (valid: bool)
+    ensures valid == ((facts::names(status, "created"@) || facts::names(status, "reconstructed"@))
+        && destination_matches && fork_matches_base && processes_array),
+{
+    (facts::identity_text(status, "created") || facts::identity_text(status, "reconstructed"))
+        && destination_matches && fork_matches_base && processes_array
+}
+
+pub(crate) fn context_originals<'a>(
+    context: Option<&'a str>, origin: Option<&'a str>, birth: Option<&'a str>,
+) -> (paths: [Option<&'a str>; 3])
+    ensures paths@ == seq![context, origin, birth],
+{
+    [context, origin, birth]
+}
+
 pub fn accepts_input_entry(expected: &str, observed: &str, regular: bool) -> (valid: bool)
     ensures valid == (regular && expected@ == observed@),
 {
@@ -385,10 +424,7 @@ fn produce(
             let profile: Value = decode(
                 &fs::read(no_symlink_parents(root, &req.profile)?).map_err(|e| e.to_string())?,
             )?;
-            let scoped = matches!(
-                profile["schema"].as_str(),
-                Some("chrono-ci-check/v1" | "chrono-ci-check/v2" | "chrono-ci-check/v3")
-            );
+            let scoped = scoped_check_profile(profile["schema"].as_str());
             let scope = match &req.selection {
                 Selection::All => None,
                 Selection::Unit { unit } => Some(Scope::Unit { unit: unit.clone() }),
@@ -421,13 +457,11 @@ fn produce(
                         format!("missing full check origin receipt {}: {e}", p.origin_path)
                     })?;
                 let origin: Value = decode(&origin_bytes)?;
-                if origin["schema"] != "chrono-worktree-origin/v1"
-                    || origin["destination"] != json!(root)
-                    || !matches!(
-                        origin["run_kind"].as_str(),
-                        Some("integration" | "delivery")
-                    )
-                {
+                if !full_check_origin(
+                    origin["schema"].as_str(),
+                    origin["destination"] == json!(root),
+                    origin["run_kind"].as_str(),
+                ) {
                     return Err("invalid full check origin identity/role".into());
                 }
                 let birth_path = origin["birth_report"]
@@ -436,22 +470,23 @@ fn produce(
                 artifact_path(birth_path)?;
                 let birth_bytes =
                     fs::read(no_symlink_parents(root, birth_path)?).map_err(|e| e.to_string())?;
-                if origin["birth_sha256"] != sha256(&birth_bytes) {
+                if !facts::identity_text(origin["birth_sha256"].as_str(), &sha256(&birth_bytes)) {
                     return Err("full check origin birth report drift".into());
                 }
                 let birth: Value = decode(&birth_bytes)?;
-                if !matches!(birth["status"].as_str(), Some("created" | "reconstructed"))
-                    || birth["destination"] != json!(root)
-                    || birth["context"]["fork_point"] != birth["base"]
-                    || !birth["processes"].is_array()
-                {
+                if !full_check_birth(
+                    birth["status"].as_str(),
+                    birth["destination"] == json!(root),
+                    birth["context"]["fork_point"] == birth["base"],
+                    birth["processes"].is_array(),
+                ) {
                     return Err("full check origin does not reference successful creation".into());
                 }
                 let branch = r
                     .text(root, &["symbolic-ref", "--short", "HEAD"])?
                     .trim()
                     .to_string();
-                if birth["branch_ref"] != branch {
+                if !facts::identity_text(birth["branch_ref"].as_str(), &branch) {
                     return Err("full check branch differs from original birth association".into());
                 }
                 let fork = birth["context"]["fork_point"]
@@ -531,7 +566,7 @@ fn produce(
                     raw: retained_raw,
                 })
             };
-            if r.oid(root, "HEAD")? != candidate {
+            if !facts::identity_text(Some(&r.oid(root, "HEAD")?), &candidate) {
                 return Err("HEAD advanced during local preparation".into());
             }
             start::cleanliness_at(r, root, &candidate, registrations.config())?;
@@ -545,20 +580,21 @@ fn produce(
             Ok(())
         },
     )?;
-    if report["status"] != "prepared" {
+    if !facts::identity_text(report["status"].as_str(), "prepared") {
         return Err(serde_json::to_string(&report).map_err(|e| e.to_string())?);
     }
     let mut originals = vec![prepared::original(
         &req.host_root,
         report["report_path"].as_str().ok_or("report path")?,
     )?];
-    if let Some(path) = report["check_context"]["path"].as_str() {
-        originals.push(prepared::original(&req.host_root, path)?);
-    }
-    if let Some(path) = report["origin"]["path"].as_str() {
-        originals.push(prepared::original(&req.host_root, path)?);
-    }
-    if let Some(path) = report["origin"]["birth_report"].as_str() {
+    for path in context_originals(
+        report["check_context"]["path"].as_str(),
+        report["origin"]["path"].as_str(),
+        report["origin"]["birth_report"].as_str(),
+    )
+    .into_iter()
+    .flatten()
+    {
         originals.push(prepared::original(&req.host_root, path)?);
     }
     let mut evidence = json!({"report_path":report["report_path"],"report_sha256":file_identity(&no_symlink_parents(&req.host_root,report["report_path"].as_str().ok_or("report path")?)?)?.0,"origin":report["origin"],"remote":report["remote"],"target_ref":report["target_ref"]});

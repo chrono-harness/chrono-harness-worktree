@@ -1,11 +1,66 @@
 //! Explicit saved-state maintenance; this produces observations, never judge verdicts.
 #![allow(unexpected_cfgs)]
+#[cfg(verus_keep_ghost)]
+use super::facts;
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
 verus! {
+pub(crate) fn failed_report_identity(
+    schema: Option<&str>, status: Option<&str>, operation_allowed: bool,
+    source_matches: bool, config_matches: bool, digest_matches: bool, path_matches: bool,
+) -> (accepted: bool)
+    ensures accepted == (facts::names(schema, "chrono-worktree-report/v1"@) && facts::names(status, "failed"@)
+        && operation_allowed && source_matches && config_matches && digest_matches && path_matches),
+{
+    facts::identity_text(schema, "chrono-worktree-report/v1") && facts::identity_text(status, "failed")
+        && operation_allowed && source_matches && config_matches && digest_matches && path_matches
+}
+
+pub(crate) fn unchanged_report(actual: &[u8], original: &[u8]) -> (same: bool)
+    ensures same == (actual@ == original@),
+{
+    proof {
+        assert(actual.deep_view() =~= actual@);
+        assert(original.deep_view() =~= original@);
+    }
+    <&[u8]>::exec_eq(actual, original)
+}
+
+pub(crate) fn direct_reference(symbolic_exit: i32) -> (direct: bool)
+    ensures direct == (symbolic_exit == 1),
+{
+    symbolic_exit == 1
+}
+
+pub(crate) enum FetchRefAction {
+    CheckCommit,
+    AlreadyAbsent,
+    Reject,
+}
+
+pub(crate) fn fetch_ref_action(lookup_exit: i32, allow_absent: bool) -> (action: FetchRefAction)
+    ensures
+        (action is CheckCommit) == (lookup_exit == 0),
+        (action is AlreadyAbsent) == (lookup_exit == 1 && allow_absent),
+        (action is Reject) == (lookup_exit != 0 && (lookup_exit != 1 || !allow_absent)),
+{
+    match lookup_exit {
+        0 => FetchRefAction::CheckCommit,
+        1 if allow_absent => FetchRefAction::AlreadyAbsent,
+        _ => FetchRefAction::Reject,
+    }
+}
+
+pub(crate) fn fetch_ref_absent(lookup_exit: i32) -> (absent: bool)
+    ensures absent == (lookup_exit == 1),
+{
+    lookup_exit == 1
+}
+
 /// A successful removal needs independent observations from the filesystem and Git.
 pub fn removed_checkout(path_absent: bool, conflicting_registration: bool) -> (absent: bool)
     ensures absent == (path_absent && !conflicting_registration),
@@ -32,6 +87,8 @@ use crate::document::sha256;
 use crate::document::{decode, json, relative_path};
 #[cfg(not(verus_keep_ghost))]
 use crate::facts;
+#[cfg(not(verus_keep_ghost))]
+use crate::facts::identity_text;
 #[cfg(not(verus_keep_ghost))]
 use crate::registration::Registrations;
 #[cfg(not(verus_keep_ghost))]
@@ -638,7 +695,7 @@ fn failed_report(
 ) -> Result<(Value, Vec<u8>), String> {
     artifacts(registrations, &[&receipt.path])?;
     let bytes = state_bytes(root, &receipt.path)?;
-    if sha256(&bytes) != receipt.sha256 {
+    if !identity_text(Some(&sha256(&bytes)), &receipt.sha256) {
         return Err("original report digest mismatch".into());
     }
     let original = json(&bytes)?;
@@ -647,16 +704,20 @@ fn failed_report(
         "receipt":{"path":receipt.path,"sha256":receipt.sha256},
         "input":recovery::retained_input(root, &receipt.path, &bytes, "receipt")
     });
-    if original["schema"] != "chrono-worktree-report/v1"
-        || original["status"] != "failed"
-        || !original["operation"]
-            .as_str()
-            .is_some_and(|operation| operations.contains(&operation))
-        || original["source_root"] != value!(root)
-        || original["config_path"] != config_path
-        || original["config_sha256"] != sha256(config_bytes)
-        || original["report_path"] != receipt.path
-    {
+    if !failed_report_identity(
+        original["schema"].as_str(),
+        original["status"].as_str(),
+        original["operation"].as_str().is_some_and(|operation| {
+            operations
+                .iter()
+                .any(|name| identity_text(Some(operation), name))
+        }),
+        root.to_str()
+            .is_some_and(|root| identity_text(original["source_root"].as_str(), root)),
+        identity_text(original["config_path"].as_str(), config_path),
+        identity_text(original["config_sha256"].as_str(), &sha256(config_bytes)),
+        identity_text(original["report_path"].as_str(), &receipt.path),
+    ) {
         return Err("original failed-operation/configuration identity mismatch".into());
     }
     Ok((original, bytes))
@@ -683,7 +744,7 @@ fn recover(
         &["start", "reconstruct", "cleanup", "rebind"],
     )?;
     release_reconciled(r, root, report, &original, head, tree, || {
-        if state_bytes(root, &receipt.path)? != bytes {
+        if !unchanged_report(&state_bytes(root, &receipt.path)?, &bytes) {
             return Err("original report changed during recovery".into());
         }
         Ok(())
@@ -742,7 +803,7 @@ pub(crate) fn retained_commit_reachable(
     retained_commit: &str,
     current_commit: &str,
 ) -> Result<(), String> {
-    if current_commit != retained_commit {
+    if !identity_text(Some(current_commit), retained_commit) {
         r.git(
             root,
             &[
@@ -809,11 +870,13 @@ pub(crate) fn saved_commit_with_reference(
     for oid in &oids {
         facts::full_oid(oid)?;
     }
-    if retained_reference_ancestor_required(oids[0] == retained_commit, allow_retained_ref_advance)?
-    {
+    if retained_reference_ancestor_required(
+        identity_text(Some(oids[0]), retained_commit),
+        allow_retained_ref_advance,
+    )? {
         retained_commit_reachable(r, root, retained_commit, oids[0])?;
     }
-    if oids[1] != head {
+    if !identity_text(Some(oids[1]), head) {
         return Err("cleanup HEAD is not a commit".into());
     }
     match retention {
@@ -824,7 +887,7 @@ pub(crate) fn saved_commit_with_reference(
             )?;
         }
         Retention::SameTree => {
-            if oids[2] != oids[3] {
+            if !identity_text(Some(oids[2]), oids[3]) {
                 return Err("retained commit does not preserve the exact worktree tree".into());
             }
         }
@@ -1095,7 +1158,7 @@ fn cleanup_fetch(
         retained_commit,
         allow_absent,
         || {
-            if state_bytes(root, &receipt.path)? != bytes {
+            if !unchanged_report(&state_bytes(root, &receipt.path)?, &bytes) {
                 return Err("original report changed during fetch-ref cleanup".into());
             }
             Ok(())
@@ -1132,14 +1195,14 @@ fn cleanup_fetch_ref(
         &Retention::Ancestor,
     )?;
     let symbolic = r.command(root, &["symbolic-ref", "--quiet", fetch_ref])?;
-    if symbolic.exit_code != 1 {
+    if !direct_reference(symbolic.exit_code) {
         return Err("temporary fetch ref must be a direct ref".into());
     }
     let exists = r.command(root, &["show-ref", "--verify", "--quiet", fetch_ref])?;
-    match exists.exit_code {
-        1 if allow_absent => report["fetch_ref_removal"] = value!("already-absent"),
-        0 => {
-            if r.oid(root, fetch_ref)? != head {
+    match fetch_ref_action(exists.exit_code, allow_absent) {
+        FetchRefAction::AlreadyAbsent => report["fetch_ref_removal"] = value!("already-absent"),
+        FetchRefAction::CheckCommit => {
+            if !identity_text(Some(&r.oid(root, fetch_ref)?), head) {
                 return Err("temporary fetch ref changed; preserve its current value".into());
             }
             stable()?;
@@ -1151,20 +1214,29 @@ fn cleanup_fetch_ref(
                 retained_commit,
                 &Retention::Ancestor,
             )?;
+            let symbolic = r.command(root, &["symbolic-ref", "--quiet", fetch_ref])?;
+            if !direct_reference(symbolic.exit_code) {
+                return Err("temporary fetch ref must be a direct ref".into());
+            }
             report["fetch_ref_removal"] = value!("attempted-unverified");
             r.git(root, &["update-ref", "--no-deref", "-d", fetch_ref, head])?;
-            if r.command(root, &["show-ref", "--verify", "--quiet", fetch_ref])?
-                .exit_code
-                != 1
-            {
+            if !fetch_ref_absent(
+                r.command(root, &["show-ref", "--verify", "--quiet", fetch_ref])?
+                    .exit_code,
+            ) {
+                return Err("temporary fetch-ref absence was not verified after deletion".into());
+            }
+            let symbolic = r.command(root, &["symbolic-ref", "--quiet", fetch_ref])?;
+            if !direct_reference(symbolic.exit_code) {
                 return Err("temporary fetch-ref absence was not verified after deletion".into());
             }
             report["fetch_ref_removed"] = value!(true);
             report["fetch_ref_removal"] = value!("verified-absent");
         }
-        code => {
+        FetchRefAction::Reject => {
             return Err(format!(
-                "temporary fetch-ref lookup exited {code}; absence requires an explicit retry plan"
+                "temporary fetch-ref lookup exited {}; absence requires an explicit retry plan",
+                exists.exit_code,
             ));
         }
     }

@@ -6,12 +6,53 @@ use chrono_worktree::verified_lifecycle as input_policy;
 use vstd::prelude::verus;
 
 #[cfg(verus_keep_ghost)]
-use vstd::prelude::*;
+use vstd::{contrib::exec_spec::ExecSpecEq, prelude::*};
 
 #[cfg(verus_keep_ghost)]
 use vstd::vpanic as panic;
 
 verus! {
+#[cfg(verus_keep_ghost)]
+fn the_profile_and_birth_must_authorize_full_context() {
+    use super::expect;
+    use input_policy::check_inputs::{context_originals, full_check_birth, full_check_origin, scoped_check_profile};
+    broadcast use vstd::array::group_array_axioms;
+    proof {
+        reveal_strlit("full");
+        reveal_strlit("chrono-ci-check/v1");
+        reveal_strlit("chrono-ci-check/v2");
+        reveal_strlit("chrono-ci-check/v3");
+        reveal_strlit("feature");
+        reveal_strlit("integration");
+        reveal_strlit("delivery");
+        assert("full"@.len() != "chrono-ci-check/v1"@.len()
+            && "full"@.len() != "chrono-ci-check/v2"@.len()
+            && "full"@.len() != "chrono-ci-check/v3"@.len());
+        assert("feature"@.len() != "integration"@.len() && "feature"@.len() != "delivery"@.len());
+    }
+    expect(scoped_check_profile(Some("chrono-ci-check/v1")));
+    expect(scoped_check_profile(Some("chrono-ci-check/v2")));
+    expect(scoped_check_profile(Some("chrono-ci-check/v3")));
+    expect(!scoped_check_profile(Some("full")));
+    expect(!scoped_check_profile(None));
+    let origin_schema = Some("chrono-worktree-origin/v1");
+    expect(full_check_origin(origin_schema, true, Some("integration")));
+    expect(full_check_origin(origin_schema, true, Some("delivery")));
+    expect(!full_check_origin(origin_schema, true, Some("feature")));
+    expect(!full_check_origin(origin_schema, false, Some("delivery")));
+    expect(!full_check_origin(None, true, Some("delivery")));
+    expect(full_check_birth(Some("created"), true, true, true));
+    expect(full_check_birth(Some("reconstructed"), true, true, true));
+    expect(!full_check_birth(None, true, true, true));
+    expect(!full_check_birth(Some("created"), false, true, true));
+    expect(!full_check_birth(Some("created"), true, false, true));
+    expect(!full_check_birth(Some("created"), true, true, false));
+    let paths = context_originals(Some("context"), None, Some("birth"));
+    expect(matches!(paths[0], Some(path) if <&str>::exec_eq(path, "context")));
+    expect(paths[1].is_none());
+    expect(matches!(paths[2], Some(path) if <&str>::exec_eq(path, "birth")));
+}
+
 #[cfg_attr(not(verus_keep_ghost), test)]
 fn presence_hash_and_length_must_stay_together() {
     proof {
