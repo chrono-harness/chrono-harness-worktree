@@ -82,6 +82,111 @@ mod process_boundaries;
 verus! {
 
 #[cfg(verus_keep_ghost)]
+fn managed_use_and_finish_boundaries(original: &str, handoff: &str, exit: i32)
+    requires exit != 0,
+{
+    use policy::{ManagedUseOutcome, ProcessOutcome};
+    proof {
+        reveal_strlit("active");
+        reveal_strlit("retained");
+        reveal_strlit("terminal");
+        assert("active"@.len() != "retained"@.len());
+        assert("active"@.len() != "terminal"@.len());
+    }
+
+    let outcome = policy::process_outcome(Some(original), exit);
+    assert(outcome == ProcessOutcome::Failed(original));
+    let outcome = policy::process_outcome(None::<&str>, exit);
+    assert(outcome == ProcessOutcome::<&str>::NonzeroExit);
+    let outcome = policy::process_outcome(None::<&str>, 0);
+    assert(outcome == ProcessOutcome::<&str>::Succeeded);
+    let outcome = policy::managed_use_outcome(true, Some(handoff));
+    assert(outcome == ManagedUseOutcome::<&str>::CommandFailed);
+    let outcome = policy::managed_use_outcome(false, Some(handoff));
+    assert(outcome == ManagedUseOutcome::HandoffFailed(handoff));
+    let outcome = policy::managed_use_outcome(false, None::<&str>);
+    assert(outcome == ManagedUseOutcome::<&str>::Succeeded);
+
+    let error = policy::finish_error(true, true, true, "terminal", 1, false);
+    assert(error.unwrap()@
+        == "main finish only releases caches; evidence/landing disposal is not authorized"@);
+    let outcome = policy::finish_error(true, false, false, "terminal", 1, false);
+    assert(outcome.is_none());
+    let error = policy::finish_error(false, true, true, "terminal", 1, false);
+    assert(error.unwrap()@
+        == "worktree is terminal or has active/unknown managed use; preserve it"@);
+    let error = policy::finish_error(false, true, false, "active", 1, false);
+    assert(error.unwrap()@
+        == "worktree is terminal or has active/unknown managed use; preserve it"@);
+    let outcome = policy::finish_error(false, true, false, "retained", 0, false);
+    assert(outcome.unwrap()@
+        == "policy does not authorize terminal evidence disposal"@);
+    let outcome = policy::finish_error(false, true, true, "retained", 0, true);
+    assert(outcome.is_none());
+    let outcome = policy::finish_error(false, false, false, "active", 0, false);
+    assert(outcome.is_none());
+    let outcome = policy::may_start_managed_use("active");
+    assert(outcome);
+    let outcome = policy::may_start_managed_use("retained");
+    assert(!outcome);
+    let outcome = policy::may_start_managed_use("terminal");
+    assert(!outcome);
+    let outcome = policy::binds_completed_use(true, true, true);
+    assert(outcome);
+    let outcome = policy::binds_completed_use(false, true, true);
+    assert(!outcome);
+    let outcome = policy::binds_completed_use(true, false, true);
+    assert(!outcome);
+    let outcome = policy::binds_completed_use(true, true, false);
+    assert(!outcome);
+}
+
+#[cfg(verus_keep_ghost)]
+fn recovery_and_maintenance_boundaries()
+{
+    proof {
+        reveal_strlit("owner");
+        reveal_strlit("other");
+        reveal_strlit("chrono-worktree-config/v2");
+        reveal_strlit("chrono-worktree-config/v3");
+        assert("owner"@[1] != "other"@[1]);
+        assert("chrono-worktree-config/v2"@[24] != "chrono-worktree-config/v3"@[24]);
+    }
+    let outcome = policy::recovery_inventory_matches(Some("abc"), "abc", true, None, None, false);
+    assert(outcome);
+    let outcome = policy::recovery_inventory_matches(
+        Some("abc"), "abc", true, Some("owner"), Some("owner"), false);
+    assert(outcome);
+    let outcome = policy::recovery_inventory_matches(
+        Some("abc"), "abc", true, Some("owner"), None, false);
+    assert(!outcome);
+    let outcome = policy::recovery_inventory_matches(
+        Some("abc"), "abc", true, None, Some("owner"), false);
+    assert(!outcome);
+    let outcome = policy::recovery_inventory_matches(
+        Some("abc"), "abc", true, Some("other"), Some("owner"), false);
+    assert(!outcome);
+    let outcome = policy::recovery_inventory_matches(None, "abc", true, None, None, false);
+    assert(!outcome);
+    let outcome = policy::recovery_inventory_matches(Some("abc"), "abc", false, None, None, false);
+    assert(!outcome);
+    let outcome = policy::recovery_inventory_matches(Some("abc"), "abc", true, None, None, true);
+    assert(!outcome);
+    let outcome = policy::maintenance_complete(0);
+    assert(outcome);
+    let outcome = policy::maintenance_complete(1);
+    assert(!outcome);
+    let outcome = policy::standalone_expiry_ready(Some("chrono-worktree-config/v2"), 0, true);
+    assert(!outcome);
+    let outcome = policy::standalone_expiry_ready(Some("chrono-worktree-config/v3"), 0, false);
+    assert(!outcome);
+    let outcome = policy::standalone_expiry_ready(Some("chrono-worktree-config/v3"), 1, true);
+    assert(!outcome);
+    let outcome = policy::standalone_expiry_ready(Some("chrono-worktree-config/v3"), 0, true);
+    assert(outcome);
+}
+
+#[cfg(verus_keep_ghost)]
 fn fetched_commit_and_deletion_result(base: &str, other: &str, original: String)
     requires base@ != other@,
 {

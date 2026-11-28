@@ -79,6 +79,23 @@ pub fn retained_reference_ancestor_required(reference_matches: bool, allow_advan
     else if allow_advance { Ok(true) }
     else { Err("retained reference changed".to_string()) }
 }
+
+pub(crate) fn recovery_inventory_matches(
+    reported_head: Option<&str>, head: &str, branch_matches: bool,
+    reported_lock: Option<&str>, expected_lock: Option<&str>, prunable: bool,
+) -> (accepted: bool)
+    ensures accepted == (facts::names(reported_head, head@) && branch_matches && !prunable
+        && match expected_lock {
+            Some(lock) => facts::names(reported_lock, lock@),
+            None => reported_lock.is_none(),
+        }),
+{
+    facts::identity_text(reported_head, head) && branch_matches && !prunable
+        && match expected_lock {
+            Some(lock) => facts::identity_text(reported_lock, lock),
+            None => reported_lock.is_none(),
+        }
+}
 }
 
 #[cfg(not(verus_keep_ghost))]
@@ -657,20 +674,26 @@ pub(crate) fn identity(
         .iter()
         .filter(|x| x.get("worktree").is_some_and(|p| Path::new(p) == target))
         .collect();
-    if rows.len() != 1
-        || rows[0].get("HEAD").map(String::as_str) != Some(head)
-        || !matches_checkout_reference(rows[0], &checkout_reference(branch))
-        || rows[0].get("locked").map(String::as_str) != lock
-        || rows[0].contains_key("prunable")
-    {
+    let [row] = rows.as_slice() else {
+        return Err("worktree identity or ownership lock mismatch".into());
+    };
+    let branch = checkout_reference(branch);
+    if !recovery_inventory_matches(
+        row.get("HEAD").map(String::as_str),
+        head,
+        matches_checkout_reference(row, &branch),
+        row.get("locked").map(String::as_str),
+        lock,
+        row.contains_key("prunable"),
+    ) {
         return Err("worktree identity or ownership lock mismatch".into());
     }
     let observed = r.checkout_identity(target)?;
     if fs::canonicalize(target).map_err(|e| e.to_string())? != target
         || fs::canonicalize(&observed.top).map_err(|e| e.to_string())? != target
         || fs::canonicalize(&observed.common).map_err(|e| e.to_string())? != common(r, root)?
-        || observed.head != head
-        || observed.branch != checkout_reference(branch)
+        || !identity_text(Some(&observed.head), head)
+        || !identity_text(Some(&observed.branch), &branch)
     {
         return Err("checkout identity or common repository mismatch".into());
     }
@@ -770,7 +793,7 @@ pub(crate) fn release_reconciled(
     let config_path = r.config.host_config.clone();
     let (target_registrations, _) = start::registrations(r, target, head, &config_path)?;
     start::exact_checkout(r, target, tree)?;
-    if r.text(target, &["write-tree"])?.trim() != tree {
+    if !identity_text(Some(r.text(target, &["write-tree"])?.trim()), tree) {
         return Err("reconciled index tree mismatch".into());
     }
     start::untracked(r, target, target_registrations.config())?;
@@ -783,7 +806,7 @@ pub(crate) fn release_reconciled(
         &checkout_reference(branch),
         head,
     )?;
-    if r.text(target, &["write-tree"])?.trim() != tree {
+    if !identity_text(Some(r.text(target, &["write-tree"])?.trim()), tree) {
         return Err("index changed while releasing recovery lock".into());
     }
     start::exact_checkout(r, target, tree)?;
@@ -1096,7 +1119,7 @@ impl Cleanup {
                     )?;
                     let absent =
                         r.command(root, &["show-ref", "--verify", "--quiet", &branch_ref])?;
-                    if absent.exit_code != 1 {
+                    if !fetch_ref_absent(absent.exit_code) {
                         return Err("branch absence was not verified after deletion".into());
                     }
                     report["branch_removed"] = value!(true);

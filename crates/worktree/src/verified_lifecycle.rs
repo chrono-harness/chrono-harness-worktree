@@ -99,6 +99,8 @@ pub(crate) mod maintenance_verification;
 #[cfg(not(verus_keep_ghost))]
 pub use crate::maintenance::{removed_checkout, retained_reference_ancestor_required};
 #[cfg(verus_keep_ghost)]
+pub(crate) use maintenance_verification::recovery_inventory_matches;
+#[cfg(verus_keep_ghost)]
 pub use maintenance_verification::{removed_checkout, retained_reference_ancestor_required};
 
 #[cfg(verus_keep_ghost)]
@@ -134,6 +136,11 @@ pub use crate::automatic::{
     MissingCacheObservation, absence_probe_required, absent_attachment_conflict, admission_handoff,
     known_absent_enrollment, missing_cache_observation, publish_enrollment_record,
     retain_cleanup_attempt, unfinished_cleanup_publication,
+};
+#[cfg(verus_keep_ghost)]
+pub(crate) use automatic_verification::{
+    ManagedUseOutcome, ProcessOutcome, binds_completed_use, finish_error, managed_use_outcome,
+    may_start_managed_use, process_outcome,
 };
 #[cfg(verus_keep_ghost)]
 pub use automatic_verification::{
@@ -179,6 +186,8 @@ pub use automatic_verification::migration::{
     adopted_policy_binding_error, checkout_migration_ready, policy_migration_decision,
     policy_state_conflict, policy_state_present, store_current_policy,
 };
+#[cfg(verus_keep_ghost)]
+pub(crate) use automatic_verification::service::{maintenance_complete, standalone_expiry_ready};
 #[cfg(verus_keep_ghost)]
 pub use automatic_verification::service::{
     maintenance_exclusions, maintenance_has_events, maintenance_retention_phase, next_enrollment,

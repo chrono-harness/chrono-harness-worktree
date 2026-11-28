@@ -1,6 +1,5 @@
 //! Opt-in lifecycle cleanup with explicit terminal and kernel-quiescent cache phases.
 #![allow(unexpected_cfgs)]
-#[cfg(not(verus_keep_ghost))]
 use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
@@ -197,6 +196,91 @@ pub fn retain_cleanup_attempt(age_retirement: bool, pending: bool, current: bool
         age_retirement || pending ==> retain,
 {
     age_retirement || pending || current
+}
+
+pub(crate) enum ProcessOutcome<E> {
+    Succeeded,
+    Failed(E),
+    NonzeroExit,
+}
+
+/// Preserve a process supervisor's original failure even when an exit code is present.
+pub(crate) fn process_outcome<E>(failure: Option<E>, exit: i32) -> (out: ProcessOutcome<E>)
+    ensures out == match failure {
+        Some(error) => ProcessOutcome::Failed(error),
+        None if exit == 0 => ProcessOutcome::Succeeded,
+        None => ProcessOutcome::NonzeroExit,
+    },
+{
+    match failure {
+        Some(error) => ProcessOutcome::Failed(error),
+        None if exit == 0 => ProcessOutcome::Succeeded,
+        None => ProcessOutcome::NonzeroExit,
+    }
+}
+
+pub(crate) enum ManagedUseOutcome<E> {
+    Succeeded,
+    CommandFailed,
+    HandoffFailed(E),
+}
+
+/// A failed managed command has priority over an independent artifact handoff failure.
+pub(crate) fn managed_use_outcome<E>(command_failed: bool, handoff: Option<E>)
+    -> (out: ManagedUseOutcome<E>)
+    ensures out == if command_failed { ManagedUseOutcome::CommandFailed } else {
+        match handoff {
+            Some(error) => ManagedUseOutcome::HandoffFailed(error),
+            None => ManagedUseOutcome::Succeeded,
+        }
+    },
+{
+    if command_failed {
+        return ManagedUseOutcome::CommandFailed;
+    }
+    match handoff {
+        Some(error) => ManagedUseOutcome::HandoffFailed(error),
+        None => ManagedUseOutcome::Succeeded,
+    }
+}
+
+pub(crate) fn may_start_managed_use(status: &str) -> (allowed: bool)
+    ensures allowed == (status@ == "active"@),
+{
+    <&str>::exec_eq(status, "active")
+}
+
+pub(crate) fn binds_completed_use(attachment: bool, enrollment_receipt: bool, token: bool)
+    -> (bound: bool)
+    ensures bound == (attachment && enrollment_receipt && token),
+{
+    attachment && enrollment_receipt && token
+}
+
+/// Main-cache finish is a release. Linked finish records a terminal handoff.
+pub(crate) fn finish_error(cache_only: bool, dispose_evidence: bool, landing_pin: bool,
+    status: &str, uses: usize, evidence_allowed: bool) -> (error: Option<&'static str>)
+    ensures error == if cache_only && (dispose_evidence || landing_pin) {
+            Some("main finish only releases caches; evidence/landing disposal is not authorized")
+        } else if !cache_only && (!(status@ == "active"@ || status@ == "retained"@) || uses != 0) {
+            Some("worktree is terminal or has active/unknown managed use; preserve it")
+        } else if !cache_only && dispose_evidence && !evidence_allowed {
+            Some("policy does not authorize terminal evidence disposal")
+        } else { None },
+{
+    if cache_only {
+        if dispose_evidence || landing_pin {
+            return Some("main finish only releases caches; evidence/landing disposal is not authorized");
+        }
+    } else {
+        if !(may_start_managed_use(status) || <&str>::exec_eq(status, "retained")) || uses != 0 {
+            return Some("worktree is terminal or has active/unknown managed use; preserve it");
+        }
+        if dispose_evidence && !evidence_allowed {
+            return Some("policy does not authorize terminal evidence disposal");
+        }
+    }
+    None
 }
 
 }
@@ -3988,21 +4072,21 @@ impl Manager {
             None
         };
         let e = self.ledger.entries[i].clone();
+        if let Some(error) = finish_error(
+            e.cache_only,
+            dispose_evidence,
+            pin.is_some(),
+            &e.status,
+            e.uses.len(),
+            self.inputs.policy.allow_evidence_disposal,
+        ) {
+            return Err(error.into());
+        }
         if e.cache_only {
-            if dispose_evidence || pin.is_some() {
-                return Err(
-                    "main finish only releases caches; evidence/landing disposal is not authorized"
-                        .into(),
-                );
-            }
             let head = r.oid(&target, "HEAD")?;
             self.check_entry(r, &e, &head, None)?;
-            let generation = e
-                .ownership
-                .as_ref()
-                .ok_or("main cache ownership missing")?
-                .generation
-                .checked_add(1)
+            let owner = e.ownership.as_ref().ok_or("main cache ownership missing")?;
+            let generation = cache_adoption::custody_generation(owner.generation)
                 .ok_or("main cache release generation overflow")?;
             let receipt = self.immutable(
                 &format!("main-release-{token}.json"),
@@ -4030,14 +4114,6 @@ impl Manager {
             crate::recovery::bind_report_inputs(&self.inputs.policy.coordinator_root, report)?;
             report["worktree_removal"] = value!("preserved");
             return Ok(());
-        }
-        if !matches!(e.status.as_str(), "active" | "retained") || !e.uses.is_empty() {
-            return Err(
-                "worktree is terminal or has active/unknown managed use; preserve it".into(),
-            );
-        }
-        if dispose_evidence && !self.inputs.policy.allow_evidence_disposal {
-            return Err("policy does not authorize terminal evidence disposal".into());
         }
         self.birth_ready(&e)?;
         let head = r.oid(&target, "HEAD")?;
@@ -5454,7 +5530,10 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                             )?
                             .ok_or("cleanup policy disappeared during main check")?;
                             observer.observe_attention(r, report, false)?;
-                            if process.failure.is_some() || process.exit_code != 0 {
+                            if !matches!(
+                                process_outcome(process.failure.as_ref(), process.exit_code),
+                                ProcessOutcome::Succeeded
+                            ) {
                                 report["managed_command_failed"] = value!(true);
                                 return Err(format!(
                                     "check failed with exit {}",
@@ -5466,7 +5545,7 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                         None => return Err("managed use requires an enrolled worktree".into()),
                     };
                     let e = manager.ledger.entries[i].clone();
-                    if e.status != "active" {
+                    if !may_start_managed_use(&e.status) {
                         return Err("terminal worktree refuses new managed use".into());
                     }
                     if e.enrollment["kind"] == "birth"
@@ -5524,9 +5603,7 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                             .any(|a| a.generation == e.ownership.as_ref().unwrap().generation);
                         let owner = manager.ledger.entries[i].ownership.as_mut().unwrap();
                         if !owner.cache_pending || published_attempt {
-                            owner.generation = owner
-                                .generation
-                                .checked_add(1)
+                            owner.generation = cache_adoption::custody_generation(owner.generation)
                                 .ok_or("cache generation overflow")?;
                         }
                         owner.cache_pending = true;
@@ -5571,8 +5648,12 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                             value!({"producer":artifact_producer,"path":artifact.path()});
                     }
                     let process = originals.run(target, command, report)?;
+                    let command_failed = !matches!(
+                        process_outcome(process.failure.as_ref(), process.exit_code),
+                        ProcessOutcome::Succeeded
+                    );
                     let artifact_error = if let Some(artifact) = &mut artifact {
-                        match artifact.finish(process.failure.is_some() || process.exit_code != 0) {
+                        match artifact.finish(command_failed) {
                             Ok(handoff) => {
                                 report["artifact_directory"]["handoff"] = value!({"status":handoff["status"],"report_path":handoff["report_path"],"error":handoff["error"]});
                                 (handoff["status"] != "finished").then(|| {
@@ -5607,11 +5688,12 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                     let i = manager
                         .current_entry(target)
                         .ok_or("managed enrollment disappeared")?;
-                    if manager.ledger.entries[i].attachment != e.attachment
-                        || manager.ledger.entries[i].enrollment["receipt"]
-                            != e.enrollment["receipt"]
-                        || !manager.ledger.entries[i].uses.iter().any(|s| s == token)
-                    {
+                    let current = &manager.ledger.entries[i];
+                    if !binds_completed_use(
+                        current.attachment == e.attachment,
+                        current.enrollment["receipt"] == e.enrollment["receipt"],
+                        current.uses.iter().any(|s| s == token),
+                    ) {
                         return Err("managed use identity disappeared".into());
                     }
                     manager.ledger.entries[i]
@@ -5627,17 +5709,17 @@ pub(crate) fn dispatch(args: &[String]) -> Result<Value, String> {
                     manager.save()?;
                     report["maintenance_request"] =
                         service::handoff(&manager.inputs, "use-completed");
-                    if process.failure.is_some() || process.exit_code != 0 {
-                        report["managed_command_failed"] = value!(true);
-                        return Err(format!(
-                            "registered managed command failed with exit {}: {:?}",
-                            process.exit_code, process.failure
-                        ));
+                    match managed_use_outcome(command_failed, artifact_error) {
+                        ManagedUseOutcome::Succeeded => Ok(()),
+                        ManagedUseOutcome::CommandFailed => {
+                            report["managed_command_failed"] = value!(true);
+                            Err(format!(
+                                "registered managed command failed with exit {}: {:?}",
+                                process.exit_code, process.failure
+                            ))
+                        }
+                        ManagedUseOutcome::HandoffFailed(error) => Err(error),
                     }
-                    if let Some(error) = artifact_error {
-                        return Err(error);
-                    }
-                    Ok(())
                 }
                 _ => unreachable!(),
             }
