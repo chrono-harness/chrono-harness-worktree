@@ -43,23 +43,47 @@ selection=$state/tool-selection
 resolved=$selection/versions.toml
 data=$work/versions.toml
 : > "$data"
+# Generated from verification/install_target.rs during Copier development.
+validate_installation_path() {
+    target_path=$1
+    target_role=$2
+    shift 2
+    target_flags=
+    for target_test in -L -e; do
+        if test "$target_test" "$target_path"; then
+            target_flags=${target_flags}1
+        else
+            target_flags=${target_flags}0
+        fi
+    done
+    if test "$@"; then target_flags=${target_flags}1; else target_flags=${target_flags}0; fi
+    case "$target_role:$target_flags" in
+        directory:010) fail "Expected an installation state directory: $target_path" ;;
+        directory:100) fail "Expected an installation state directory: $target_path" ;;
+        directory:101) fail "Expected an installation state directory: $target_path" ;;
+        directory:110) fail "Expected an installation state directory: $target_path" ;;
+        directory:111) fail "Expected an installation state directory: $target_path" ;;
+        file:010) fail "Expected a regular installation selection: $target_path" ;;
+        file:100) fail "Expected a regular installation selection: $target_path" ;;
+        file:101) fail "Expected a regular installation selection: $target_path" ;;
+        file:110) fail "Expected a regular installation selection: $target_path" ;;
+        file:111) fail "Expected a regular installation selection: $target_path" ;;
+        entry:010) fail "Unexpected installation data entry: $target_path" ;;
+        entry:100) fail "Unexpected installation data entry: $target_path" ;;
+        entry:110) fail "Unexpected installation data entry: $target_path" ;;
+    esac
+}
 validate_target() {
-    for dir in "$PWD/.chrono-harness" "$state" "$selection"; do
-        if [ -L "$dir" ] || { [ -e "$dir" ] && [ ! -d "$dir" ]; }; then
-            fail "Expected an installation state directory: $dir"
-        fi
-    done
-    for file in "$legacy" "$resolved"; do
-        if [ -L "$file" ] || { [ -e "$file" ] && [ ! -f "$file" ]; }; then
-            fail "Expected a regular installation selection: $file"
-        fi
-    done
+    validate_installation_path "$PWD/.chrono-harness" directory -d "$PWD/.chrono-harness"
+    validate_installation_path "$state" directory -d "$state"
+    validate_installation_path "$selection" directory -d "$selection"
+    validate_installation_path "$legacy" file -f "$legacy"
+    validate_installation_path "$resolved" file -f "$resolved"
     for entry in "$selection"/* "$selection"/.[!.]* "$selection"/..?*; do
-        if [ "$entry" != "$resolved" ] && { [ -e "$entry" ] || [ -L "$entry" ]; }; then
-            fail "Unexpected installation data entry: $entry"
-        fi
+        validate_installation_path "$entry" entry "$entry" = "$resolved"
     done
 }
+
 validate_target
 export MISE_IGNORED_CONFIG_PATHS="${MISE_IGNORED_CONFIG_PATHS:+$MISE_IGNORED_CONFIG_PATHS:}$legacy:$projection"
 export MISE_TRUSTED_CONFIG_PATHS="$work${MISE_TRUSTED_CONFIG_PATHS:+:$MISE_TRUSTED_CONFIG_PATHS}"

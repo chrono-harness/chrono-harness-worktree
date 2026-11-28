@@ -21,23 +21,10 @@ mod release_observation;
 #[path = "adopted_owner.rs"]
 mod adopted_owner_boundaries;
 
-#[path = "../../../.chrono-harness/ci/roadmap.rs"]
-mod roadmap;
+#[path = "../../../.chrono-harness/ci/host_adapters.rs"]
+mod host_adapters;
 
 verus! {
-
-// The selected Copier template owns these deployed tool-selection inputs.
-fn deployed_tool_selection() -> (&'static str, &'static str) {
-    (include_str!("../../../.config/mise/conf.d/selected-chrono-harness.toml"),
-     include_str!("../../../.chrono-harness/install-tools.sh"))
-}
-
-fn matches_tool_selection(selection: &str, installer: &str) -> (matches: bool)
-    ensures matches == (selection@ == "577707757340d6472c8b6be6c61b3af34b7558bc046deb7081285a207a4b03cd"@ && installer@ == "bb02bed142aaf7e95775ff14109a733adfe2939b9a14d24fa7fcfb502b6b5d90"@),
-{
-    <&str>::exec_eq(selection, "577707757340d6472c8b6be6c61b3af34b7558bc046deb7081285a207a4b03cd")
-        && <&str>::exec_eq(installer, "bb02bed142aaf7e95775ff14109a733adfe2939b9a14d24fa7fcfb502b6b5d90")
-}
 
 fn expect_protected(value: bool)
     requires value,
@@ -497,10 +484,9 @@ fn final_publication_requires_exact_installed_payload_and_retained_original() {
 #[test]
 fn deployed_tool_selection_matches_the_host_template() {
     use sha2::{Digest, Sha256};
-    let (selection, installer) = deployed_tool_selection();
-    let digest = |source: &str| hex::encode(Sha256::digest(source.as_bytes()));
-    assert!(matches_tool_selection(
-        &digest(selection),
-        &digest(installer)
-    ));
+    let selection = host_adapters::installed_config();
+    assert_eq!(
+        hex::encode(Sha256::digest(selection.as_bytes())),
+        "577707757340d6472c8b6be6c61b3af34b7558bc046deb7081285a207a4b03cd"
+    );
 }

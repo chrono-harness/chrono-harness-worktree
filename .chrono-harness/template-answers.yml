@@ -1,4 +1,4 @@
-_commit: v0.1.48
+_commit: v0.1.54
 _src_path: gh:chrono-harness/chrono-harness-copier
 dev_branch: dev
 features:
@@ -31,7 +31,7 @@ tool_install_channels: pinned
 tool_versions: {}
 manage_roadmap: true
 publisher_workflow: Release chrono-worktree
-host_release_artifact: {"version": "0.1.1", "linux_sha256": "8fd9f01086ad928167f2a6a0db1f6277ffc9c60cbfaf5b1994de946044040058", "macos_sha256": "ff5dd4a2943b672b7fd2f1450c4a1e27dd181cbefe12536c92c75a06dd84d63e"}
+host_release_artifact: {"version": "0.1.12", "linux_sha256": "06f52284ad8b12a71d2402f9b844863af1a10f123b6373f6373b064487da7ab4", "macos_sha256": "148ca8ee0ba4bfb688799aae65b73a9bdd36ac3c0e03d47cade37fc1da48089e"}
 dependabot_auto_merge: true
 dependabot_updates:
 - {"package-ecosystem": "github-actions", "directory": "/", "schedule": {"interval": "daily"}, "groups": {"github-actions": {"patterns": ["*"]}}}
