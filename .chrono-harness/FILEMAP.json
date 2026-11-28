@@ -434,7 +434,16 @@
           "kind": "test-execution",
           "to": "test:worktree-tests"
         }
-      ]
+      ],
+      "verification": {
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
+      }
     },
     {
       "path": "crates/worktree-tests/Cargo.lock",
