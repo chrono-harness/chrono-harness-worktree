@@ -62,9 +62,9 @@ pub fn deployed_tool_installer() -> (source: &'static str) {
 }
 
 pub fn installer_digest_matches(digest: &String) -> (accepted: bool)
-    ensures accepted == (digest@ == "38d9cad7c8e2b80ad451f2a5c7075f7451529cc1a406892dca807a2c2581f93c"@),
+    ensures accepted == (digest@ == "9f6bc7787dd8af4462dc472ae9622b38df60e727f02ff49408ab4b2eafce99df"@),
 {
-    *digest == "38d9cad7c8e2b80ad451f2a5c7075f7451529cc1a406892dca807a2c2581f93c".to_string()
+    *digest == "9f6bc7787dd8af4462dc472ae9622b38df60e727f02ff49408ab4b2eafce99df".to_string()
 }
 
 /// Both deployed files are inputs to this proof compilation and its native test.
