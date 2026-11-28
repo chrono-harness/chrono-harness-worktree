@@ -30,7 +30,7 @@ sha2 = "0.11"
 sha1 = "0.11"
 miniz_oxide = "0.9"
 serde_jcs = "=0.4.0"
-vstd = "=0.0.0-2026-04-20-1748"
+vstd = "=0.0.0-2026-11-22-0344"
 tracing-tunnel = { version = "=0.1.0", default-features = false, features = ["sender"] }
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive", "rc"] }
