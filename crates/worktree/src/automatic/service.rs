@@ -1,4 +1,5 @@
 //! One executor per physical coordinator. Events never carry business authority.
+use vstd::contrib::exec_spec::ExecSpecEq;
 #[cfg(not(verus_keep_ghost))]
 use vstd::prelude::verus;
 #[cfg(verus_keep_ghost)]
@@ -19,6 +20,24 @@ pub fn maintenance_has_events(received: usize) -> (run: bool)
     ensures run == (received > 0),
 {
     received != 0
+}
+
+pub(crate) fn maintenance_complete(failures: usize) -> (complete: bool)
+    ensures complete == (failures == 0),
+{
+    failures == 0
+}
+
+pub(crate) fn standalone_expiry_ready(schema: Option<&str>, failures: usize, complete: bool)
+    -> (ready: bool)
+    ensures ready == (schema.is_some() && schema.unwrap()@ == "chrono-worktree-config/v3"@
+        && failures == 0 && complete),
+{
+    match schema {
+        Some(schema) => <&str>::exec_eq(schema, "chrono-worktree-config/v3")
+            && maintenance_complete(failures) && complete,
+        None => false,
+    }
 }
 
 /// Preserve both actual roots, including their order and a repeated root.
@@ -587,14 +606,14 @@ pub fn maintain_host_operations(
             };
             let _custody = crate::retention::forward_scope()?;
             let result = crate::process::run_process_observed(root, &command, &[], &digest)?;
-            let failure = result.failure.clone().or_else(|| {
-                (result.exit_code != 0).then(|| {
-                    format!(
-                        "exit {} (signal {:?})",
-                        result.exit_code, result.exit_signal
-                    )
-                })
-            });
+            let failure = match super::process_outcome(result.failure.as_ref(), result.exit_code) {
+                super::ProcessOutcome::Succeeded => None,
+                super::ProcessOutcome::Failed(error) => Some(error.clone()),
+                super::ProcessOutcome::NonzeroExit => Some(format!(
+                    "exit {} (signal {:?})",
+                    result.exit_code, result.exit_signal
+                )),
+            };
             Ok::<_, String>((result.compact()?, failure))
         })();
         let (observation, failure) = match attempt {
@@ -892,7 +911,7 @@ fn run_round(
     }
     report["linked_output_retention"] = value!(linked_retention);
     report["runtime_logs"] = value!(runtime_logs);
-    if r.config.schema == "chrono-worktree-config/v3" && failures.is_empty() && namespace_complete {
+    if standalone_expiry_ready(Some(&r.config.schema), failures.len(), namespace_complete) {
         match standalone_expiry::expire(r, token, inputs, &observation, report) {
             Ok(Some(result)) => report["standalone_report_retention"] = result,
             Ok(None) => (),
@@ -912,7 +931,7 @@ fn run_round(
     }
     report["cleanup_failures"] = value!(failures);
     report["owned_work_joined"] = value!(true); // All work above is synchronous; no children are detached.
-    if failures.is_empty() {
+    if maintenance_complete(failures.len()) {
         Ok(())
     } else {
         Err(format!("maintenance incomplete: {}", failures.join("; ")))
