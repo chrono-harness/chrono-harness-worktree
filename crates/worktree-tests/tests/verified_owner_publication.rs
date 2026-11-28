@@ -26,6 +26,11 @@ mod host_adapters;
 
 verus! {
 
+/// The deployed check is an input of this proof and its native consumer.
+pub fn native_check_script() -> &'static str {
+    include_str!("../../../check.sh")
+}
+
 fn expect_protected(value: bool)
     requires value,
 {
@@ -488,5 +493,16 @@ fn deployed_tool_selection_matches_the_host_template() {
     assert_eq!(
         hex::encode(Sha256::digest(selection.as_bytes())),
         "577707757340d6472c8b6be6c61b3af34b7558bc046deb7081285a207a4b03cd"
+    );
+}
+
+#[cfg(not(verus_keep_ghost))]
+#[test]
+fn native_check_matches_the_compiled_host_input() {
+    let deployed = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../check.sh");
+    assert_eq!(
+        std::fs::read(&deployed)
+            .unwrap_or_else(|error| panic!("cannot read {}: {error}", deployed.display())),
+        native_check_script().as_bytes()
     );
 }
