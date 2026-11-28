@@ -181,8 +181,13 @@
         }
       ],
       "verification": {
-        "role": "data",
-        "roots": []
+        "role": "program",
+        "roots": [
+          {
+            "path": "crates/worktree-tests/tests/verified_owner_publication.rs",
+            "operation": "verify.owner-publication-tests"
+          }
+        ]
       }
     },
     {
@@ -899,7 +904,7 @@
       }
     },
     {
-      "path": ".chrono-harness/ci/roadmap.rs",
+      "path": ".chrono-harness/ci/host_adapters.rs",
       "owner": "worktree-tests",
       "surface": "test",
       "cost": "unmeasured",

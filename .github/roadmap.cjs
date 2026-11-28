@@ -16,12 +16,8 @@ function judge(command, query) {
 
 const roadmap = query => judge('roadmap-v1', query)
 
-const coreVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
-
 module.exports = async function syncRoadmap(github, context, plan) {
-  if (plan !== null && (typeof plan.version !== 'string' || !coreVersion.test(plan.version))) {
-    throw new Error('Expected version X.Y.Z in .chrono-harness/release.json')
-  }
+  const rolling = roadmap({operation: 'rolling-plan', plan})
   const repo = context.repo
   const issues = github.rest.issues
   const all = (method, parameters) => github.paginate(method, {...repo, per_page: 100, ...parameters})
@@ -38,8 +34,7 @@ module.exports = async function syncRoadmap(github, context, plan) {
   const releasesForPlan = releases.map(({tag_name, draft, prerelease, published_at}) =>
     ({tag_name, draft, prerelease, published_at}))
   let target = plan ? 'v' + plan.version : null
-  if (plan?.version_policy === 'next_patch') {
-    if (plan.kind !== 'copier') throw new Error('next_patch requires a Copier source product')
+  if (rolling) {
     const latest = judge('template-latest-stable-v1', releasesForPlan)
     target = 'v' + judge('template-next-version-v1', {
       floor: plan.version, latest: latest === null ? null : latest.slice(1),
@@ -47,7 +42,7 @@ module.exports = async function syncRoadmap(github, context, plan) {
   }
   const releaseEvent = context.payload.release?.tag_name
   const selection = roadmap({
-    operation: 'release-selection', releases: releasesForPlan,
+    operation: 'release-selection', reconcile: true, releases: releasesForPlan,
     event_tag: releaseEvent, target, milestones: milestones.map(m => m.title),
   })
   const unassigned = await all(issues.listForRepo, {state: 'open', milestone: 'none'})
@@ -59,27 +54,22 @@ module.exports = async function syncRoadmap(github, context, plan) {
   }
   // Publishers using GITHUB_TOKEN wake this workflow via workflow_run.
   // Use the newest public release even when this host has no version plan.
-  const releasedVersion = selection.tag?.split('-')[0]
-  if (target) await ensure(target)
-  if (releasedVersion?.startsWith('v') && coreVersion.test(releasedVersion.slice(1))) {
-    await ensure(releasedVersion)
-  }
+  for (const title of selection.ensure) await ensure(title)
 
   for (const known of milestones) {
-    if (!known.title.startsWith('v') || !coreVersion.test(known.title.slice(1))) continue
-    const indices = selection.milestones[known.title]
+    if (!Object.hasOwn(selection.refresh, known.title)) continue
+    const indices = selection.refresh[known.title]
     const final = releases[indices.final]
     const preview = releases[indices.preview]
-    if (!final && !preview) continue
     const {data: milestone} = await issues.getMilestone({...repo, milestone_number: known.number})
     const lines = []
     if (preview) lines.push(`测试版 [${preview.tag_name}](${preview.html_url})`)
     if (final) lines.push(`正式版 [${final.tag_name}](${final.html_url})`)
-    const original = milestone.description || ''
-    const description = roadmap({operation: 'release-block', milestone: milestone.number, original, lines})
-    const state = roadmap({operation: 'milestone', final_release: Boolean(final), open_issues: milestone.open_issues})
-    if (description !== original || state !== milestone.state) {
-      await issues.updateMilestone({...repo, milestone_number: known.number, description, state})
+    const update = roadmap({operation: 'milestone-update', milestone: milestone.number,
+      original: milestone.description || '', lines, state: milestone.state,
+      final_release: Boolean(final), open_issues: milestone.open_issues})
+    if (update !== null) {
+      await issues.updateMilestone({...repo, milestone_number: known.number, ...update})
     }
   }
 }
@@ -104,7 +94,7 @@ module.exports.releaseIssue = async function releaseIssue(github, context) {
     case 'close': {
       const original = history.find(item => item.number === issue).body
       const recovery = `同次运行已恢复。[成功的第 ${run.run_attempt} 次尝试](${run.html_url}/attempts/${run.run_attempt})`
-      const body = original.includes(recovery) ? original : original + '\n\n' + recovery
+      const body = roadmap({operation: 'recovery-body', original, recovery})
       await issues.update({...repo, issue_number: issue, state: 'closed', body})
       return
     }
