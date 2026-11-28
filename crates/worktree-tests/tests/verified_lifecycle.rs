@@ -117,6 +117,47 @@ fn unresolved_fetch_reference(reference: &str, other: &str, head: &str, changed:
 }
 
 #[cfg(verus_keep_ghost)]
+fn failed_receipts_require_every_bound_observation() {
+    use policy::maintenance_verification::failed_report_identity;
+    let schema = Some("chrono-worktree-report/v1");
+    let failed = Some("failed");
+    proof {
+        reveal_strlit("created");
+        reveal_strlit("failed");
+        assert("created"@.len() != "failed"@.len());
+    }
+    expect(failed_report_identity(schema, failed, true, true, true, true, true));
+    expect(!failed_report_identity(None, failed, true, true, true, true, true));
+    expect(!failed_report_identity(schema, Some("created"), true, true, true, true, true));
+    expect(!failed_report_identity(schema, failed, false, true, true, true, true));
+    expect(!failed_report_identity(schema, failed, true, false, true, true, true));
+    expect(!failed_report_identity(schema, failed, true, true, false, true, true));
+    expect(!failed_report_identity(schema, failed, true, true, true, false, true));
+    expect(!failed_report_identity(schema, failed, true, true, true, true, false));
+}
+
+#[cfg(verus_keep_ghost)]
+fn fetch_cleanup_distinguishes_a_conflict_from_an_explicit_absent_retry() {
+    use policy::maintenance_verification::{direct_reference, fetch_ref_absent, fetch_ref_action, unchanged_report};
+    use policy::maintenance_verification::FetchRefAction::{AlreadyAbsent, CheckCommit, Reject};
+    expect(direct_reference(1));
+    expect(!direct_reference(0));
+    expect(!direct_reference(128));
+    expect(matches!(fetch_ref_action(0, true), CheckCommit));
+    expect(matches!(fetch_ref_action(0, false), CheckCommit));
+    expect(matches!(fetch_ref_action(1, true), AlreadyAbsent));
+    expect(matches!(fetch_ref_action(1, false), Reject));
+    expect(matches!(fetch_ref_action(128, true), Reject));
+    expect(fetch_ref_absent(1));
+    expect(!fetch_ref_absent(0));
+    expect(!fetch_ref_absent(128));
+    let original: [u8; 2] = [9, 4];
+    let replaced: [u8; 2] = [9, 8];
+    expect(unchanged_report(&original, &original));
+    expect(!unchanged_report(&original, &replaced));
+}
+
+#[cfg(verus_keep_ghost)]
 fn cli_write_results(code: u8, primary: u32, secondary: u32) {
     use policy::cli::published_exit;
     let normal = published_exit::<u32>(code, Ok(()), Ok(()));

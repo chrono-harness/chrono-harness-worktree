@@ -95,7 +95,7 @@ pub(crate) mod maintenance_signal;
 
 #[cfg(verus_keep_ghost)]
 #[path = "maintenance.rs"]
-mod maintenance_verification;
+pub(crate) mod maintenance_verification;
 #[cfg(not(verus_keep_ghost))]
 pub use crate::maintenance::{removed_checkout, retained_reference_ancestor_required};
 #[cfg(verus_keep_ghost)]
@@ -103,7 +103,7 @@ pub use maintenance_verification::{removed_checkout, retained_reference_ancestor
 
 #[cfg(verus_keep_ghost)]
 #[path = "check_inputs.rs"]
-mod check_inputs;
+pub(crate) mod check_inputs;
 #[cfg(not(verus_keep_ghost))]
 pub use crate::check_inputs::{
     accepts_input_entry, dedicated_input_path, full_paths_distinct, unchanged_input,

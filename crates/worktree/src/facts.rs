@@ -2,6 +2,16 @@
 use vstd::{contrib::exec_spec::ExecSpecEq, prelude::*};
 
 verus! {
+pub(crate) open spec fn names(value: Option<&str>, wanted: Seq<char>) -> bool {
+    match value { Some(value) => value@ == wanted, None => false }
+}
+
+pub(crate) fn identity_text(value: Option<&str>, wanted: &str) -> (same: bool)
+    ensures same == names(value, wanted@),
+{
+    match value { Some(value) => <&str>::exec_eq(value, wanted), None => false }
+}
+
 pub open spec fn lowercase_hex(b: u8) -> bool {
     (48 <= b <= 57) || (97 <= b <= 102)
 }
